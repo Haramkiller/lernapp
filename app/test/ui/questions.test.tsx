@@ -91,6 +91,6 @@ describe('Free', () => {
     expect(screen.getByText('Konzentrationsgefälle')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Nicht gewusst' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Teilweise' }))
-    expect(onAnswer).toHaveBeenCalledWith('partial', { kind: 'free' })
+    expect(onAnswer).toHaveBeenCalledWith('partial', { kind: 'free', text: 'Wasser geht durch Membran' })
   })
 })

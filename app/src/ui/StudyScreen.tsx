@@ -26,7 +26,7 @@ type Props = {
   onFinished?: () => void
   onExit: () => void
   /** Task 9: „Nachfragen“ zur aktuellen Karte. */
-  onAsk?: (card: Card) => void
+  onAsk?: (card: Card, answer: Answer) => void
   /** Prüft Karten vor dem Lernen; Standard: gemeinsames Schema. Ungültige Karten werden übersprungen. */
   validate?: (card: Card) => boolean
 }
@@ -187,7 +187,7 @@ export function StudyScreen({
       )}
       <ErrorBoundary key={card.id} onSkip={next}>
         {result ? (
-          <Feedback card={card} outcome={result.outcome} answer={result.answer} onNext={next} onAsk={onAsk ? () => onAsk(card) : undefined} />
+          <Feedback card={card} outcome={result.outcome} answer={result.answer} onNext={next} onAsk={onAsk ? () => onAsk(card, result.answer) : undefined} />
         ) : (
           <Question card={card} rng={rng} onAnswer={answer} />
         )}

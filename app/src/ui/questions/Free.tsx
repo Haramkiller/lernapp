@@ -6,7 +6,7 @@ export function Free({ card, onAnswer }: QuestionProps<'free'>) {
   const { question, modelAnswer, keyPoints } = card.payload
   const [text, setText] = useState('')
   const [revealed, setRevealed] = useState(false)
-  const rate = (o: Outcome) => onAnswer(o, { kind: 'free' })
+  const rate = (o: Outcome) => onAnswer(o, { kind: 'free', text })
 
   return (
     <section>

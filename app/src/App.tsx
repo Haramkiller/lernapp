@@ -4,6 +4,10 @@ import { resolveSupabaseConfig, type SupabaseConfig } from './data/config'
 import { createSupabaseRemote } from './data/remote'
 import { loadOverride, saveOverride } from './data/settings'
 import { sync } from './data/sync'
+import type { Card } from '@lernapp/shared'
+import { AskDialog } from './ui/AskDialog'
+import { InstallHint } from './ui/InstallHint'
+import type { Answer } from './ui/types'
 import { HomeScreen, type SyncStatus } from './ui/HomeScreen'
 import { LoginScreen, type AuthMode } from './ui/LoginScreen'
 import { SettingsScreen } from './ui/SettingsScreen'
@@ -21,6 +25,7 @@ export function App() {
   const [view, setView] = useState<View>({ name: 'home' })
   const [status, setStatus] = useState<SyncStatus>({ kind: 'idle' })
   const [refreshKey, setRefreshKey] = useState(0)
+  const [asking, setAsking] = useState<{ card: Card; answer: Answer } | null>(null)
 
   const loadConfig = useCallback(async () => {
     setConfig(resolveSupabaseConfig(env, await loadOverride()))
@@ -77,6 +82,8 @@ export function App() {
     }
   }, [signedIn, runSync])
 
+  const getToken = useCallback(async () => (await client?.auth.getSession())?.data.session?.access_token ?? null, [client])
+
   const authenticate = async (mode: AuthMode, email: string, password: string): Promise<string | void> => {
     if (!client) return
     if (mode === 'signIn') {
@@ -113,6 +120,7 @@ export function App() {
 
   return (
     <main className="app">
+      <InstallHint />
       {view.name === 'home' && (
         <HomeScreen
           sync={status}
@@ -126,12 +134,14 @@ export function App() {
         <StudyScreen
           moduleId={view.moduleId}
           onFinished={() => void runSync()}
+          onAsk={(card, answer) => setAsking({ card, answer })}
           onExit={() => {
             setRefreshKey((k) => k + 1)
             setView({ name: 'home' })
           }}
         />
       )}
+      {asking && <AskDialog card={asking.card} answer={asking.answer} getToken={getToken} onClose={() => setAsking(null)} />}
       {view.name === 'settings' && (
         <SettingsScreen
           onBack={() => setView({ name: 'home' })}

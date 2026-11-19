@@ -10,7 +10,7 @@ export type Answer =
   | { kind: 'cloze'; inputs: string[]; perGap: boolean[] }
   | { kind: 'matching'; mapping: number[] }
   | { kind: 'order'; order: number[] }
-  | { kind: 'free' }
+  | { kind: 'free'; text: string }
 
 export type QuestionProps<T extends Card['type']> = {
   card: CardOf<T>
