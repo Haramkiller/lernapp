@@ -1,0 +1,13 @@
+{
+  "name": "lernapp",
+  "private": true,
+  "type": "module",
+  "workspaces": ["shared", "app", "werkstatt"],
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}
