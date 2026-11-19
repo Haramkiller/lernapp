@@ -18,6 +18,8 @@ import {
 export interface Gateway {
   isLoggedIn(): boolean
   login(email: string, password: string): Promise<void>
+  /** Prüft ein Supabase-Zugriffstoken (z. B. die App-Sitzung) beim Auth-Server. */
+  verifyToken(token: string): Promise<boolean>
   listModules(): Promise<Module[]>
   listTopics(moduleId: string): Promise<Topic[]>
   listCards(moduleId: string): Promise<Card[]>
@@ -52,6 +54,10 @@ export function createSupabaseGateway(cfg: SupabaseConfig): Gateway {
       const { error } = await client.auth.signInWithPassword({ email, password })
       if (error) throw new Error('Anmeldung fehlgeschlagen: E-Mail oder Passwort stimmen nicht (oder keine Verbindung).')
       loggedIn = true
+    },
+    async verifyToken(token) {
+      const { data, error } = await client.auth.getUser(token)
+      return !error && !!data.user
     },
     async listModules() {
       const { data, error } = await authed().from('modules').select('*').order('name')

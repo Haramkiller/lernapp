@@ -31,6 +31,8 @@ export interface ServerDeps {
   publicDir?: string
   /** Löscht Dateien (Tests können das beobachten). */
   removeFile?: (path: string) => Promise<void>
+  /** Leeres Arbeitsverzeichnis für /api/ask (Standard: <uploadDir>/ask-empty). */
+  askDir?: string
 }
 
 export interface RejectedCard {
@@ -73,11 +75,24 @@ export function createServer(deps: ServerDeps) {
   const uploadDir = deps.uploadDir ?? join(HERE, '..', 'tmp')
   const publicDir = deps.publicDir ?? join(HERE, '..', 'public')
   const removeFile = deps.removeFile ?? ((p: string) => rm(p, { force: true }))
+  const askDir = deps.askDir ?? join(uploadDir, 'ask-empty')
   mkdirSync(uploadDir, { recursive: true })
+  mkdirSync(askDir, { recursive: true })
 
   const jobs = new Map<string, Job>()
   const app = express()
   app.disable('x-powered-by')
+
+  // DNS-Rebinding-Schutz: nur Aufrufe mit lokalem Host; Cross-Site nur von erlaubter Origin.
+  const hosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`])
+  app.use((req, res, next) => {
+    if (!hosts.has(String(req.headers.host ?? '').toLowerCase())) return void res.status(403).json({ error: 'Host nicht erlaubt.' })
+    const origin = req.headers.origin
+    if (req.headers['sec-fetch-site'] === 'cross-site' && !(origin !== undefined && allowed.has(origin))) {
+      return void res.status(403).json({ error: 'Cross-Site-Anfrage nicht erlaubt.' })
+    }
+    next()
+  })
 
   // CORS: nur die konfigurierte App-Origin, die lokale Entwicklungs-Origin und die Werkstatt selbst.
   // Fremde Origins werden abgewiesen (schützt auch vor Fremdseiten, die die lokale Werkstatt ansprechen).
@@ -97,6 +112,7 @@ export function createServer(deps: ServerDeps) {
     next()
   })
 
+  app.use('/api/ask', express.json({ limit: '200kb' }))
   app.use(express.json({ limit: '20mb' }))
 
   const upload = multer({
@@ -360,24 +376,46 @@ export function createServer(deps: ServerDeps) {
 
   // --- Nachfragen am PC --------------------------------------------------------------------------
 
+  const askAuth = (req: Request, res: Response, next: NextFunction) => {
+    const g = deps.gateway
+    if (g?.isLoggedIn()) return next()
+    const m = /^Bearer (.+)$/.exec(req.headers.authorization ?? '')
+    if (!g || !m) return void res.status(401).json({ error: 'Nicht angemeldet (Werkstatt-Login oder App-Sitzung nötig).' })
+    g.verifyToken(m[1]!).then(
+      (ok) => (ok ? next() : void res.status(401).json({ error: 'Ungültige oder abgelaufene Sitzung.' })),
+      () => void res.status(401).json({ error: 'Sitzung konnte nicht geprüft werden.' }),
+    )
+  }
+
   app.post(
     '/api/ask',
+    askAuth,
     wrap(async (req, res) => {
       const { card, userAnswer, history } = req.body ?? {}
       if (!card || typeof card !== 'object' || typeof userAnswer !== 'string') {
         res.status(400).json({ error: 'card und userAnswer angeben.' })
         return
       }
-      const hist = Array.isArray(history)
-        ? history
-            .filter((h) => h && typeof h.role === 'string' && typeof h.text === 'string')
-            .map((h) => ({ role: h.role as string, text: h.text as string }))
-        : []
-      const answer = await deps.runClaude(askPrompt(card as Card, userAnswer, hist), { addDir: uploadDir })
+      if (userAnswer.length > 2000) return void res.status(413).json({ error: 'Die Antwort ist zu lang (max. 2000 Zeichen).' })
+      if (JSON.stringify(card).length > 20000) return void res.status(413).json({ error: 'Die Karte ist zu groß.' })
+      if (history !== undefined && !Array.isArray(history)) return void res.status(400).json({ error: 'history muss eine Liste sein.' })
+      const entries: unknown[] = history ?? []
+      if (entries.length > 20) return void res.status(413).json({ error: 'Der Verlauf ist zu lang (max. 20 Einträge).' })
+      const hist: { role: string; text: string }[] = []
+      for (const h of entries as { role?: unknown; text?: unknown }[]) {
+        if (!h || typeof h.role !== 'string' || typeof h.text !== 'string') continue
+        if (h.text.length > 4000) return void res.status(413).json({ error: 'Ein Verlaufseintrag ist zu lang (max. 4000 Zeichen).' })
+        hist.push({ role: h.role, text: h.text })
+      }
+      const answer = await deps.runClaude(askPrompt(card as Card, userAnswer, hist), { addDir: askDir })
       res.json({ answer })
     }),
   )
 
   app.use(express.static(publicDir))
+  app.use((err: { status?: number; type?: string }, _req: Request, res: Response, _next: NextFunction) => {
+    if (err.type === 'entity.too.large') return void res.status(413).json({ error: 'Anfrage ist zu groß.' })
+    res.status(err.status && err.status < 500 ? err.status : 500).json({ error: 'Ungültige Anfrage.' })
+  })
   return app
 }

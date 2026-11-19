@@ -1,11 +1,21 @@
 import { describe, expect, it, vi } from 'vitest'
-import request from 'supertest'
+import st from 'supertest'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Card, Module, Topic } from '@lernapp/shared'
 import { createServer, type ServerDeps } from '../src/server'
 import type { Gateway } from '../src/supabase'
+
+// Supertest nutzt einen zufälligen Port; die Werkstatt erwartet Host 127.0.0.1:<port> (Standard 5174).
+const request = (app: Parameters<typeof st>[0]) => {
+  const t = st(app)
+  return {
+    get: (u: string) => t.get(u).set('Host', '127.0.0.1:5174'),
+    post: (u: string) => t.post(u).set('Host', '127.0.0.1:5174'),
+    options: (u: string) => t.options(u).set('Host', '127.0.0.1:5174'),
+  }
+}
 
 const APP = 'https://me.github.io'
 
@@ -31,6 +41,7 @@ function fakeGateway(init: { modules?: Module[]; topics?: Topic[]; cards?: Card[
   const calls = { upsertCards: [] as Card[][], upsertTopics: [] as Topic[][], upsertModule: [] as Module[] }
   const gateway: Gateway = {
     isLoggedIn: () => loggedIn,
+    verifyToken: async (tok) => tok === 'gueltig',
     login: vi.fn(async (_e: string, p: string) => {
       if (p !== 'richtig') throw new Error('Anmeldung fehlgeschlagen')
       loggedIn = true
@@ -233,15 +244,55 @@ describe('Werkstatt-Server', () => {
     expect(calls.upsertCards).toHaveLength(3)
   })
 
-  it('ask liefert die Antwort als Text', async () => {
-    const runClaude = vi.fn(async () => 'Weil Chlorophyll …')
+  const askBody = { card: { type: 'free', payload: { question: 'q', modelAnswer: 'a', keyPoints: ['a'] }, explanation: '', source: null }, userAnswer: 'b', history: [] }
+
+  it('ask: 401 ohne Login und ohne Token, auch unkonfiguriert', async () => {
+    const runClaude = vi.fn(async () => 'x')
     const { app } = setup({ runClaude })
-    const r = await request(app)
-      .post('/api/ask')
-      .send({ card: { type: 'free', payload: { question: 'q', modelAnswer: 'a', keyPoints: ['a'] }, explanation: '', source: null }, userAnswer: 'b', history: [] })
-      .expect(200)
+    await request(app).post('/api/ask').send(askBody).expect(401)
+    await request(app).post('/api/ask').set('Authorization', 'Bearer falsch').send(askBody).expect(401)
+    const none = setup({ gateway: null, runClaude })
+    await request(none.app).post('/api/ask').send(askBody).expect(401)
+    expect(runClaude).not.toHaveBeenCalled()
+  })
+
+  it('ask: 200 mit gültigem Bearer-Token oder Werkstatt-Login, Claude läuft im leeren Ordner', async () => {
+    const runClaude = vi.fn(async () => 'Weil Chlorophyll …')
+    const { app, deps } = setup({ runClaude })
+    const r = await request(app).post('/api/ask').set('Authorization', 'Bearer gueltig').send(askBody).expect(200)
     expect(r.body).toEqual({ answer: 'Weil Chlorophyll …' })
-    expect(runClaude).toHaveBeenCalledOnce()
+    expect(runClaude).toHaveBeenCalledWith(expect.any(String), { addDir: join(deps.uploadDir!, 'ask-empty') })
+    await login(app)
+    await request(app).post('/api/ask').send(askBody).expect(200)
+  })
+
+  it('ask: begrenzt Eingaben', async () => {
+    const runClaude = vi.fn(async () => 'x')
+    const { app } = setup({ runClaude })
+    const post = (b: object) => request(app).post('/api/ask').set('Authorization', 'Bearer gueltig').send(b)
+    await post({ ...askBody, userAnswer: 'a'.repeat(2001) }).expect(413)
+    await post({ ...askBody, history: Array.from({ length: 21 }, () => ({ role: 'user', text: 'x' })) }).expect(413)
+    await post({ ...askBody, history: [{ role: 'user', text: 'x'.repeat(4001) }] }).expect(413)
+    await post({ ...askBody, card: { ...askBody.card, explanation: 'x'.repeat(20001) } }).expect(413)
+    await post({ ...askBody, userAnswer: 'a'.repeat(300_000) }).expect(413)
+    expect(runClaude).not.toHaveBeenCalled()
+  })
+})
+
+describe('Host-Schutz', () => {
+  it('lehnt fremden Host ab, erlaubt lokalen', async () => {
+    const { app } = setup()
+    expect((await st(app).get('/api/health').set('Host', 'evil.example:5174')).status).toBe(403)
+    expect((await st(app).get('/api/modules').set('Host', 'rebind.example')).status).toBe(403)
+    expect((await st(app).get('/api/health').set('Host', 'localhost:5174')).status).toBe(200)
+    expect((await request(app).get('/api/health')).status).toBe(200)
+  })
+
+  it('Sec-Fetch-Site cross-site nur von erlaubter Origin', async () => {
+    const { app } = setup()
+    expect((await request(app).get('/api/health').set('Sec-Fetch-Site', 'cross-site')).status).toBe(403)
+    expect((await request(app).get('/api/health').set('Sec-Fetch-Site', 'cross-site').set('Origin', 'https://evil.example')).status).toBe(403)
+    expect((await request(app).get('/api/health').set('Sec-Fetch-Site', 'cross-site').set('Origin', APP)).status).toBe(200)
   })
 })
 
