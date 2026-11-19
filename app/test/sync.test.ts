@@ -11,7 +11,7 @@ import { newDoneKey } from '../src/session/queue'
  * In-Memory-Server: bedingter Upsert (älteres updated_at wird ignoriert, wie der DB-Trigger) und ein
  * streng wachsendes synced_at (Serverzeit, 10 s Abstand), das nur bei angenommenen Schreibvorgängen vergeben wird.
  */
-function fakeRemote(opts: { fail?: boolean; failPush?: boolean; poison?: string[] } = {}) {
+function fakeRemote(opts: { fail?: boolean; failPush?: boolean; poison?: string[]; pushError?: RemoteError } = {}) {
   let clock = Date.parse('2026-03-10T00:00:00Z')
   type Row = { item: { updatedAt: string }; syncedAt: string }
   const tables: Record<SyncTable, Map<string, Row>> = {
@@ -24,6 +24,7 @@ function fakeRemote(opts: { fail?: boolean; failPush?: boolean; poison?: string[
     fail: opts.fail ?? false,
     failPush: opts.failPush ?? false,
     poison: new Set(opts.poison ?? []),
+    pushError: opts.pushError,
     logs: new Map<string, LogEntry>(),
     put(table: SyncTable, key: string, item: { updatedAt: string; [k: string]: unknown }) {
       const ex = tables[table].get(key)
@@ -48,12 +49,16 @@ function fakeRemote(opts: { fail?: boolean; failPush?: boolean; poison?: string[
     },
     async pushStates(s: StateRow[]) {
       if (r.fail || r.failPush) throw new Error('offline')
-      if (s.some((x) => r.poison.has(x.cardId))) throw new RemoteError('FK violation', true)
+      if (r.pushError) throw r.pushError
+      const bad = s.find((x) => r.poison.has(x.cardId))
+      if (bad) throw new RemoteError('FK violation ' + bad.cardId, true)
       for (const x of s) r.put('states', x.cardId, x)
     },
     async pushLogs(l: LogEntry[]) {
       if (r.fail || r.failPush) throw new Error('offline')
-      if (l.some((x) => r.poison.has(x.cardId))) throw new RemoteError('FK violation', true)
+      if (r.pushError) throw r.pushError
+      const bad = l.find((x) => r.poison.has(x.cardId))
+      if (bad) throw new RemoteError('FK violation ' + bad.cardId, true)
       for (const x of l) r.logs.set(x.id, x)
     },
   } satisfies Remote & Record<string, unknown>
@@ -255,9 +260,45 @@ describe('sync: Push-Fehler', () => {
     expect(await db.outbox.count()).toBe(0)
     const dead = await db.dead.toArray()
     expect(dead.map((d) => d.kind).sort()).toEqual(['log', 'state'])
-    expect(dead.every((d) => d.error === 'FK violation')).toBe(true)
+    expect(dead.every((d) => d.error === 'FK violation c1')).toBe(true)
     expect(await db.cards.get('c5')).toBeDefined() // Pull lief ebenfalls
     // Folge-Sync ist sauber.
     expect((await sync(remote, T2)).pushed).toBe(0)
+  })
+
+  it('Giftzeile mitten im Batch: nur diese landet in Quarantäne', async () => {
+    const remote = fakeRemote({ poison: ['c2'] })
+    for (const id of ['c1', 'c2', 'c3']) await learn(id, T1)
+    const res = await sync(remote, T2)
+    expect(res.pushed).toBe(4)
+    expect(remote.state('c1')).toBeDefined()
+    expect(remote.state('c3')).toBeDefined()
+    expect((await db.dead.toArray()).map((d) => (d.payload as { cardId: string }).cardId)).toEqual(['c2', 'c2'])
+    expect(await db.outbox.count()).toBe(0)
+  })
+
+  it.each([
+    ['401 (JWT abgelaufen)', new RemoteError('JWT expired', false)],
+    ['404 (Tabelle fehlt)', new RemoteError('relation not found', false)],
+  ])('%s: nichts kommt in Quarantäne, Outbox bleibt, Pull läuft', async (_n, err) => {
+    const remote = fakeRemote({ pushError: err })
+    remote.put('cards', 'c5', card('c5'))
+    await learn('c1', T1)
+    await learn('c2', T1)
+    const res = await sync(remote, T2)
+    expect(res.pushError).toBe(err.message)
+    expect(await db.dead.count()).toBe(0)
+    expect(await db.outbox.count()).toBe(4)
+    expect(await db.cards.get('c5')).toBeDefined()
+  })
+
+  it('Sicherung: scheitert auch der erste Einzelversuch identisch, wird nichts in Quarantäne gelegt', async () => {
+    const remote = fakeRemote({ pushError: new RemoteError('bad request', true) })
+    await learn('c1', T1)
+    await learn('c2', T1)
+    const res = await sync(remote, T2)
+    expect(res.pushError).toBe('bad request')
+    expect(await db.dead.count()).toBe(0)
+    expect(await db.outbox.count()).toBe(4)
   })
 })

@@ -40,7 +40,7 @@ export interface Remote {
   pushLogs(l: LogEntry[]): Promise<void>
 }
 
-/** Fehler des Servers; `permanent` = 4xx (außer 408/429): Wiederholen hilft nicht. */
+/** Fehler des Servers; `permanent` = zeilenbezogener Datenfehler (400/409/422, Postgres 23xxx): Wiederholen hilft nicht. */
 export class RemoteError extends Error {
   constructor(
     message: string,
@@ -52,9 +52,14 @@ export class RemoteError extends Error {
 
 export const isPermanentError = (e: unknown): boolean => e instanceof RemoteError && e.permanent
 
-function toError(error: { message: string }, status: number): RemoteError {
-  const permanent = status >= 400 && status < 500 && status !== 408 && status !== 429
-  return new RemoteError(error.message, permanent)
+/**
+ * Nur zeilenbezogene Datenfehler sind dauerhaft. Alles andere (401/403 abgelaufenes JWT/RLS, 404
+ * fehlende Tabelle, 408/429, 5xx, Status 0/Netz) ist vorübergehend: die Outbox bleibt erhalten.
+ */
+function toError(error: { message: string; code?: string }, status: number): RemoteError {
+  const dataError = status === 400 || status === 409 || status === 422 || /^23/.test(error.code ?? '')
+  const authError = status === 401 || status === 403
+  return new RemoteError(error.message, dataError && !authError)
 }
 
 const PAGE = 1000

@@ -52,6 +52,7 @@ async function pushUnits<T>(
 ): Promise<{ pushed: number; error?: unknown }> {
   if (units.length === 0) return { pushed: 0 }
   const count = (us: Unit<T>[]) => us.reduce((n, u) => n + u.ids.length, 0)
+  let batchError: Error
   try {
     await push(units.map((u) => u.item))
     await db.outbox.bulkDelete(units.flatMap((u) => u.ids))
@@ -62,18 +63,36 @@ async function pushUnits<T>(
       await quarantine(units[0]!.ids, e)
       return { pushed: 0 }
     }
+    batchError = e as Error
   }
+  // Sicherung: Scheitert der erste Einzelversuch mit derselben Meldung wie der Batch, wird er
+  // zurückgehalten. Scheitert auch der zweite identisch, ist es keine einzelne Giftzeile,
+  // sondern ein systemisches Problem: nichts in Quarantäne, alles behalten.
   let pushed = 0
-  for (const u of units) {
+  let held: { unit: Unit<T>; error: unknown } | undefined
+  const flush = async () => {
+    if (held) await quarantine(held.unit.ids, held.error)
+    held = undefined
+  }
+  for (const [i, u] of units.entries()) {
     try {
       await push([u.item])
+      await flush()
       await db.outbox.bulkDelete(u.ids)
       pushed += u.ids.length
     } catch (e) {
       if (!isPermanentError(e)) return { pushed, error: e }
+      const same = (e as Error).message === batchError.message
+      if (i === 0 && same) {
+        held = { unit: u, error: e }
+        continue
+      }
+      if (i === 1 && held && same) return { pushed, error: batchError }
+      await flush()
       await quarantine(u.ids, e)
     }
   }
+  await flush()
   return { pushed }
 }
 

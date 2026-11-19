@@ -79,3 +79,24 @@ describe('createSupabaseRemote.pullSince', () => {
     await expect(push(429)).rejects.toMatchObject({ permanent: false })
   })
 })
+
+describe('Fehlerklassifikation', () => {
+  const push = (status: number, code?: string) =>
+    createSupabaseRemote({
+      from: () => ({ upsert: async () => ({ error: { message: 'x', code }, status }) }),
+    } as unknown as SupabaseClient).pushLogs([
+      { id: 'l', cardId: 'c', rating: 3, reviewedAt: 'r', studyDay: 'd', elapsedDays: 0 },
+    ])
+  it.each([400, 409, 422])('%i ist dauerhaft', async (s) => {
+    await expect(push(s)).rejects.toMatchObject({ permanent: true })
+  })
+  it('Postgres-Code 23xxx ist dauerhaft', async () => {
+    await expect(push(0, '23503')).rejects.toMatchObject({ permanent: true })
+  })
+  it.each([0, 401, 403, 404, 408, 429, 500, 503])('%i ist vorübergehend', async (s) => {
+    await expect(push(s)).rejects.toMatchObject({ permanent: false })
+  })
+  it('RLS-Verstoß (403, 42501) ist vorübergehend', async () => {
+    await expect(push(403, '42501')).rejects.toMatchObject({ permanent: false })
+  })
+})
