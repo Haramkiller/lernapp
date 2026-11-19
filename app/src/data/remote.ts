@@ -81,8 +81,9 @@ export function createSupabaseRemote(client: SupabaseClient): Remote {
     let last: { synced_at: string; key: string } | undefined
     for (;;) {
       let q = client.from(table).select('*')
+      // Zeitstempel in Anführungszeichen: `+` und `:` sind in PostgREST-Filtern reservierte Zeichen.
       q = last
-        ? q.or(`synced_at.gt.${last.synced_at},and(synced_at.eq.${last.synced_at},${key}.gt.${last.key})`)
+        ? q.or(`synced_at.gt."${last.synced_at}",and(synced_at.eq."${last.synced_at}",${key}.gt.${last.key})`)
         : q.gte('synced_at', since)
       const { data, error, status } = await q
         .order('synced_at', { ascending: true })

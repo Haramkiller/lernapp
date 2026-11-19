@@ -25,7 +25,8 @@ function stubClient(data: Record<string, Row[]>, maxRows: number, failWith?: { s
             (a, c) => a.synced_at.localeCompare(c.synced_at) || String(a[keyCol]).localeCompare(String(c[keyCol])),
           )
           if (call.or) {
-            const m = /synced_at\.gt\.([^,]+),and\(synced_at\.eq\.([^,]+),\w+\.gt\.([^)]+)\)/.exec(call.or)!
+            // PostgREST: Zeitstempel enthalten reservierte Zeichen (+, :) und müssen in Anführungszeichen stehen.
+            const m = /^synced_at\.gt\."([^"]+)",and\(synced_at\.eq\."([^"]+)",\w+\.gt\.([^)]+)\)$/.exec(call.or)!
             rows = rows.filter((r) => r.synced_at > m[1]! || (r.synced_at === m[2] && String(r[keyCol]) > m[3]!))
           } else if (call.gte) rows = rows.filter((r) => r.synced_at >= call.gte!)
           return resolve({ data: rows.slice(0, Math.min(limit, maxRows)), error: null, status: 200 })
@@ -58,6 +59,9 @@ describe('createSupabaseRemote.pullSince', () => {
     expect(res.cursors.modules).toBeUndefined() // leere Tabelle: Cursor springt nicht
     // 3 Seiten mit Daten + 1 leere Abschlussseite
     expect(calls.filter((c) => c.table === 'topics')).toHaveLength(4)
+    expect(calls.find((c) => c.table === 'topics' && c.or)!.or).toBe(
+      'synced_at.gt."2026-03-10T10:00:00.100000+00:00",and(synced_at.eq."2026-03-10T10:00:00.100000+00:00",id.gt.b)',
+    )
   })
 
   it('Cursor bleibt unverändert, wenn nichts Neues kommt', async () => {

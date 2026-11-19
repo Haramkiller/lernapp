@@ -114,6 +114,7 @@ alter table public.cards enable row level security;
 alter table public.card_states enable row level security;
 alter table public.review_logs enable row level security;
 
+-- (select auth.uid()) statt auth.uid(): Postgres wertet es einmal pro Abfrage aus, nicht pro Zeile (Supabase-Empfehlung).
 do $$
 declare
   t text;
@@ -125,16 +126,16 @@ begin
     execute format('drop policy if exists %I on public.%I', t || '_delete_own', t);
 
     execute format(
-      'create policy %I on public.%I for select to authenticated using (auth.uid() = user_id)',
+      'create policy %I on public.%I for select to authenticated using ((select auth.uid()) = user_id)',
       t || '_select_own', t);
     execute format(
-      'create policy %I on public.%I for insert to authenticated with check (auth.uid() = user_id)',
+      'create policy %I on public.%I for insert to authenticated with check ((select auth.uid()) = user_id)',
       t || '_insert_own', t);
     execute format(
-      'create policy %I on public.%I for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id)',
+      'create policy %I on public.%I for update to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id)',
       t || '_update_own', t);
     execute format(
-      'create policy %I on public.%I for delete to authenticated using (auth.uid() = user_id)',
+      'create policy %I on public.%I for delete to authenticated using ((select auth.uid()) = user_id)',
       t || '_delete_own', t);
   end loop;
 end

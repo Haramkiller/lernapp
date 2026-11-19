@@ -1,6 +1,7 @@
 'use strict'
 const $ = (id) => document.getElementById(id)
-const state = { modules: [], file: null, cards: [], styleProfile: null, examTopics: null, invalid: new Map() }
+// jobModuleId: Modul, für das der Auftrag erzeugt wurde; Übernehmen nutzt es, nicht die aktuelle Auswahl.
+const state = { modules: [], file: null, cards: [], styleProfile: null, examTopics: null, jobModuleId: null, invalid: new Map() }
 const TYPE_LABEL = { choice: 'Auswahl', cloze: 'Lückentext', matching: 'Zuordnung', order: 'Reihenfolge', free: 'Freitext' }
 
 /** Element bauen; Text immer per textContent (PDF-/KI-Inhalte sind nicht vertrauenswürdig). */
@@ -103,7 +104,8 @@ drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove
 $('generate').addEventListener('click', async () => {
   const kind = document.querySelector('input[name=kind]:checked').value
   const fd = new FormData()
-  fd.append('moduleId', $('module').value)
+  const moduleId = $('module').value
+  fd.append('moduleId', moduleId)
   fd.append('kind', kind)
   fd.append('file', state.file)
   show('preview', false); show('job-error', false)
@@ -113,7 +115,7 @@ $('generate').addEventListener('click', async () => {
   $('progress-text').textContent = 'Wird vorbereitet …'
   try {
     const { jobId } = await api('/api/generate', { method: 'POST', body: fd })
-    await poll(jobId)
+    await poll(jobId, moduleId)
   } catch (e) {
     showJobError(e.message)
   } finally {
@@ -126,7 +128,7 @@ function showJobError(msg) {
   show('job-error', true)
 }
 
-async function poll(jobId) {
+async function poll(jobId, moduleId) {
   for (;;) {
     const job = await api(`/api/jobs/${jobId}`)
     $('bar').max = Math.max(job.progress.total, 1)
@@ -134,12 +136,13 @@ async function poll(jobId) {
     $('progress-text').textContent = `Abschnitt ${job.progress.done} von ${job.progress.total} fertig`
     if (job.status === 'running') { await new Promise((r) => setTimeout(r, 1500)); continue }
     if (job.error) showJobError(job.error)
-    if (job.status === 'done') startPreview(job)
+    if (job.status === 'done') startPreview(job, moduleId)
     return
   }
 }
 
-function startPreview(job) {
+function startPreview(job, moduleId) {
+  state.jobModuleId = moduleId
   state.cards = job.cards
   state.styleProfile = job.styleProfile ?? null
   state.examTopics = job.examTopics ?? null
@@ -214,9 +217,9 @@ $('commit').addEventListener('click', async () => {
   show('commit-error', false)
   $('commit').disabled = true
   try {
-    const r = await postJson('/api/commit', { moduleId: $('module').value, cards: state.cards, styleProfile: state.styleProfile ?? undefined, examTopics: state.examTopics ?? undefined })
+    const r = await postJson('/api/commit', { moduleId: state.jobModuleId, cards: state.cards, styleProfile: state.styleProfile ?? undefined, examTopics: state.examTopics ?? undefined })
     $('commit-result').textContent = `${r.added} Karte(n) übernommen, ${r.topicsCreated} neue(s) Thema/Themen, ${r.markedExamRelevant} bestehende Karte(n) als klausurrelevant markiert.`
-    state.cards = []; state.styleProfile = null; state.examTopics = null
+    state.cards = []; state.styleProfile = null; state.examTopics = null; state.jobModuleId = null
     renderCards()
     await loadModules()
   } catch (e) {
