@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lern-Werkstatt</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header><h1>Lern-Werkstatt</h1><span id="status"></span></header>
+  <main>
+    <section id="setup" hidden class="panel warn">
+      <h2>Einrichtung nötig</h2>
+      <p>Die Datei <code>werkstatt/.env</code> fehlt oder ist unvollständig. Kopiere <code>werkstatt/.env.example</code> nach <code>.env</code>, trage <code>SUPABASE_URL</code> und <code>SUPABASE_ANON_KEY</code> ein und starte die Werkstatt neu.</p>
+    </section>
+
+    <section id="login" hidden class="panel">
+      <h2>Anmelden</h2>
+      <p class="hint">Gleiche Zugangsdaten wie in der Lern-App. Sie werden nur im Arbeitsspeicher gehalten.</p>
+      <form id="login-form">
+        <label>E-Mail <input type="email" id="email" required autocomplete="username"></label>
+        <label>Passwort <input type="password" id="password" required autocomplete="current-password"></label>
+        <button type="submit">Anmelden</button>
+      </form>
+    </section>
+
+    <section id="work" hidden>
+      <div class="panel">
+        <h2>1. Modul</h2>
+        <div class="row">
+          <select id="module"></select>
+          <input id="new-module" placeholder="Neues Modul …">
+          <button id="add-module" type="button">Anlegen</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>2. PDF</h2>
+        <div id="drop" class="drop">PDF hierher ziehen oder <label class="link">auswählen<input type="file" id="file" accept="application/pdf,.pdf" hidden></label><div id="file-name"></div></div>
+        <div class="row">
+          <label><input type="radio" name="kind" value="script" checked> Skript</label>
+          <label><input type="radio" name="kind" value="exam"> Altklausur</label>
+          <button id="generate" type="button" disabled>Karten erzeugen</button>
+        </div>
+        <div id="progress" hidden>
+          <progress id="bar" value="0" max="1"></progress>
+          <span id="progress-text"></span>
+        </div>
+        <pre id="job-error" class="error" hidden></pre>
+      </div>
+
+      <div class="panel" id="preview" hidden>
+        <h2>3. Vorschau</h2>
+        <div id="meta"></div>
+        <div id="rejected" hidden></div>
+        <div id="cards"></div>
+        <div class="row">
+          <button id="commit" type="button">Übernehmen</button>
+          <span id="commit-result"></span>
+        </div>
+        <pre id="commit-error" class="error" hidden></pre>
+      </div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

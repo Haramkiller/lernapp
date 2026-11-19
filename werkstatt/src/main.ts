@@ -1,0 +1,26 @@
+import { existsSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { runClaude } from './claude'
+import { assertHasText, splitPdf } from './pdf'
+import { createServer, DEFAULT_APP_ORIGIN } from './server'
+import { createSupabaseGateway } from './supabase'
+
+const envFile = join(dirname(fileURLToPath(import.meta.url)), '..', '.env')
+if (existsSync(envFile)) process.loadEnvFile(envFile)
+
+const url = process.env.SUPABASE_URL
+const key = process.env.SUPABASE_ANON_KEY
+const port = Number(process.env.PORT) || 5174
+const gateway = url && key ? createSupabaseGateway({ url, anonKey: key }) : null
+if (!gateway) console.warn('Hinweis: werkstatt/.env fehlt oder ist unvollständig (SUPABASE_URL, SUPABASE_ANON_KEY).')
+
+const app = createServer({
+  gateway,
+  runClaude,
+  splitPdf,
+  assertHasText,
+  appOrigin: process.env.APP_ORIGIN || DEFAULT_APP_ORIGIN,
+  port,
+})
+app.listen(port, '127.0.0.1', () => console.log(`Werkstatt läuft: http://127.0.0.1:${port}`))
