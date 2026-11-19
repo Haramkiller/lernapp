@@ -88,7 +88,9 @@ export type GenerationResult = z.infer<typeof GenerationResultSchema>
 export type CardPayload = CardDraft['payload']
 
 /** Persistierte Karte: Entwurf ohne `topic`, dafür mit Identität, Zuordnung und Zeitstempeln. */
-export type Card = Omit<CardDraft, 'topic'> & {
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
+
+export type Card = DistributiveOmit<CardDraft, 'topic'> & {
   id: string
   moduleId: string
   topicId: string
