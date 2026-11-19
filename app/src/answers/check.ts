@@ -3,16 +3,32 @@ import type { ChoicePayload, ClozePayload, MatchingPayload, OrderPayload } from 
 import type { Outcome } from '../srs/grading'
 import { levenshtein } from './levenshtein'
 
-function tolerance(normalizedAnswer: string): number {
-  const n = normalizedAnswer.length
-  return n >= 10 ? 2 : n >= 5 ? 1 : 0
+/*
+ * Lückenvergleich auf normalisierten Strings:
+ * - exakte Gleichheit zählt immer;
+ * - sonst Vergleich tokenweise (Trenner: Leerraum und Bindestrich), Tokenanzahl muss gleich sein;
+ * - Tokens mit Ziffer/Nicht-Buchstabe oder römischer Zahl (i..x) müssen exakt stimmen;
+ * - reine Buchstaben-Tokens: exakt, oder Levenshtein <= 1 (Länge >= 5) bzw. <= 2 (Länge >= 10)
+ *   bei identischen ersten 4 Zeichen (Länge = Länge des erwarteten Tokens).
+ */
+const ROMAN = new Set(['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'])
+
+function tokenMatches(given: string, expected: string): boolean {
+  if (given === expected) return true
+  if (!/^\p{L}+$/u.test(expected) || ROMAN.has(expected)) return false
+  const n = expected.length
+  const tol = n >= 10 ? 2 : n >= 5 ? 1 : 0
+  return tol > 0 && given.slice(0, 4) === expected.slice(0, 4) && levenshtein(given, expected) <= tol
 }
 
 function gapMatches(input: string, answers: string[]): boolean {
   const given = normalize(input)
   return answers.some((answer) => {
     const expected = normalize(answer)
-    return given === expected || levenshtein(given, expected) <= tolerance(expected)
+    if (given === expected) return true
+    const g = given.split(/[\s-]/)
+    const e = expected.split(/[\s-]/)
+    return g.length === e.length && e.every((tok, i) => tokenMatches(g[i] ?? '', tok))
   })
 }
 

@@ -14,4 +14,10 @@ describe('normalize', () => {
     expect(normalize('Ca2+')).toBe('ca2+')
   })
   it('zerlegtes ä (a + Trema) wird zu ae', () => expect(normalize('Kräuter')).toBe('kraeuter'))
+  it('behält Minus am Rand: "Cl-", "OH-", "-5"', () => {
+    expect(normalize('Cl-')).toBe('cl-')
+    expect(normalize('OH-')).toBe('oh-')
+    expect(normalize('-5')).toBe('-5')
+  })
+  it('entfernt Anführungszeichen und Klammern am Rand', () => expect(normalize('„(Zelle)“.')).toBe('zelle'))
 })

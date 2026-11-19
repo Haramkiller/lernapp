@@ -25,6 +25,17 @@ describe('checkCloze', () => {
   })
   it('weitere akzeptierte Antworten zählen', () => expect(checkCloze(['Siebröhre'], gap('Phloem', 'Siebröhre')).perGap[0]).toBe(true))
   it('"Na" ist falsch für "Na+"', () => expect(checkCloze(['Na'], gap('Na+')).perGap[0]).toBe(false))
+  it('"Cl" ist falsch für "Cl-"', () => expect(checkCloze(['Cl'], gap('Cl-')).perGap[0]).toBe(false))
+  it.each([
+    ['ADP-Synthase', 'ATP-Synthase'],
+    ['Meiose I', 'Meiose II'],
+    ['Hypotonie', 'Hypertonie'],
+    ['Typ 1', 'Typ 2'],
+    ['Ca3+', 'Ca2+'],
+  ])('verwechselbare Begriffe: "%s" für "%s" falsch', (input, answer) =>
+    expect(checkCloze([input], gap(answer)).perGap[0]).toBe(false))
+  it('tokenweise Toleranz: "ATP-Synthas" für "ATP-Synthase" richtig', () =>
+    expect(checkCloze(['ATP-Synthas'], gap('ATP-Synthase')).perGap[0]).toBe(true))
   it('Ergebnis pro Lücke und Outcome', () => {
     expect(checkCloze(['a', 'b', 'c'], gaps('a', 'b', 'c')).outcome).toBe('right')
     expect(checkCloze(['a', 'b', 'x'], gaps('a', 'b', 'c'))).toEqual({ perGap: [true, true, false], outcome: 'partial' })

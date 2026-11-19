@@ -1,5 +1,6 @@
-// Nur Satzzeichen (\p{P}) am Rand entfernen; Symbole (+, °, ...) und % bleiben, sie tragen Bedeutung (Na+, 50%).
-const EDGE_PUNCT = /^[^\P{P}%‰]+|[^\P{P}%‰]+$/gu
+// Am Rand werden nur Satzzeichen, Anführungszeichen und Klammern entfernt. Bedeutungstragende Zeichen
+// (-, +, %, ‰, °, ...) bleiben erhalten: "Na+", "Cl-", "50%", "90°", "-5".
+const EDGE_PUNCT = /^[.,;:!?"'„“”‚‘’«»‹›()\[\]\{\}…¿¡]+|[.,;:!?"'„“”‚‘’«»‹›()\[\]\{\}…¿¡]+$/gu
 
 /** Vergleichsform für Antworten: NFC, trim, klein, Leerraum gefaltet, Umlaute ausgeschrieben, Randsatzzeichen entfernt. */
 export function normalize(s: string): string {
