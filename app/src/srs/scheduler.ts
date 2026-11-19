@@ -15,6 +15,10 @@ export type ReviewLog = {
   elapsedDays: number
 }
 
+// Bewusst die Legacy-API von ts-fsrs 6 (fsrs/createEmptyCard/next/retrievability):
+// Die nicht-deprecatete API (DefaultScheduler) ist asynchron (Promise, laedt das Modell
+// lazy), nutzt ein anderes Kartenformat (dueAt/cardId) und standardmaessig FSRS-7. Das
+// wuerde die synchrone oeffentliche Schnittstelle und das persistierte SrsState-Format aendern.
 export const DEFAULT_RETENTION = 0.9
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -36,13 +40,17 @@ export function newSrsState(now: Date): SrsState {
   return toState(createEmptyCard(now))
 }
 
-/** `cardId` landet nur im ReviewLog; die Planung selbst braucht ihn nicht. */
+export type ReviewOptions = {
+  /** Pflicht: landet im ReviewLog (Sync nutzt die ID); die Planung selbst braucht sie nicht. */
+  cardId: string
+  retention?: number
+}
+
 export function review(
   state: SrsState,
   rating: Grade,
   now: Date,
-  retention: number = DEFAULT_RETENTION,
-  cardId = '',
+  { cardId, retention = DEFAULT_RETENTION }: ReviewOptions,
 ): { state: SrsState; log: ReviewLog } {
   const scheduler = fsrs({ request_retention: retention })
   const elapsedDays = state.last_review
