@@ -24,7 +24,9 @@ Diese Anleitung ist für Menschen ohne Programmierkenntnisse gedacht. Du brauchs
 
 ## 2. GitHub-Repository und Veröffentlichung (Pages)
 
-1. Lege auf <https://github.com> ein Konto an (falls noch nicht vorhanden) und erstelle ein neues Repository, z. B. `lernapp`. Im Zweifel **public** wählen (Pages für private Repositories braucht je nach Tarif einen bezahlten Plan).
+1. Lege auf <https://github.com> ein Konto an (falls noch nicht vorhanden) und erstelle ein neues Repository, z. B. `lernapp`. Wähle **public** (siehe Kasten unten).
+
+   > **Wichtig: öffentliches Repository.** GitHub Pages mit einem kostenlosen Konto funktioniert nur mit einem **öffentlichen** Repository. Folge: Code, Dokumentation (auch der Entwurf unter `docs/superpowers`) und die gesamte Commit-Historie sind für jeden im Internet lesbar. Committe daher **niemals** Passwörter, Schlüssel oder persönliche Dateien. Skripte und Klausur-PDFs bleiben lokal auf deinem PC; die Datei `.env` ist aus genau diesem Grund von Git ausgeschlossen. Der anon/publishable-Schlüssel ist von Haus aus öffentlich (er steckt in der fertigen App). Deine Daten schützt die Zugriffsregel „Row Level Security“ aus `schema.sql` – deshalb muss `schema.sql` **vollständig** ausgeführt worden sein (Abschnitt 1, Schritt 4).
 2. **Wichtig vor dem ersten Push:** Damit deine private E-Mail-Adresse nicht in der Git-Historie landet, stelle im Projektordner die GitHub-„noreply“-Adresse ein. Du findest sie unter GitHub → **Settings** → **Emails** (Haken bei „Keep my email addresses private“ setzen, die Adresse wird dort angezeigt):
 
    ```
@@ -75,7 +77,7 @@ Danach startet die App wie eine normale App und funktioniert auch ohne Internet.
 
 ## 5. Für Freunde
 
-**Variante A: gemeinsame Datenbank (einfach).** Du gibst den App-Link weiter. Dein Freund öffnet ihn, registriert sich mit seiner eigenen E-Mail-Adresse und hat seinen eigenen, von deinem getrennten Lernstand. Nachteil: alle teilen sich dein Gratis-Kontingent bei Supabase.
+**Variante A: gemeinsame Datenbank (einfach).** Du gibst den App-Link weiter. Dein Freund öffnet ihn, registriert sich mit seiner eigenen E-Mail-Adresse und hat seinen eigenen, von deinem getrennten Lernstand. Nachteil: alle teilen sich dein Gratis-Kontingent bei Supabase. Die Registrierung ist offen: Jeder, der den Link kennt, kann sich auf deiner Datenbank registrieren (er sieht nur seine eigenen Daten). Wenn du das nicht möchtest, schalte in Supabase unter **Authentication** → **Sign In / Providers** die Neuanmeldungen aus (**Allow new users to sign up**).
 
 **Variante B: eigene Datenbank (unabhängig).**
 1. Dein Freund legt ein eigenes Supabase-Projekt an und führt `supabase/schema.sql` im SQL Editor aus (Abschnitt 1, Schritte 1 bis 7).
