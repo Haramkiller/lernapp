@@ -4,3 +4,6 @@ dist
 !.env.example
 werkstatt/tmp
 .superpowers/
+
+# Lokale Claude-Einstellungen
+.claude/settings.local.json
