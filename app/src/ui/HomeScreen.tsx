@@ -40,10 +40,13 @@ function syncText(s: SyncStatus): string {
 
 export function HomeScreen({ now = () => new Date(), sync, refreshKey = 0, onStudy, onSettings, onSyncNow }: Props) {
   const [data, setData] = useState<Data | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [retry, setRetry] = useState(0)
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
+      try {
       const t = now()
       const [cards, rows, modules, settings, dead] = await Promise.all([
         db.cards.toArray(),
@@ -56,18 +59,29 @@ export function HomeScreen({ now = () => new Date(), sync, refreshKey = 0, onStu
       const newDoneToday = ((await db.meta.get(newDoneKey(t)))?.value as number | undefined) ?? 0
       const counts = todayCounts({ cards, states, newDoneToday, now: t, settings })
       const progress = moduleProgress(modules, cards, states, t, settings.retention)
-      if (!cancelled) setData({ ...counts, modules: progress, dead })
+      if (!cancelled) {
+        setError(null)
+        setData({ ...counts, modules: progress, dead })
+      }
+      } catch (e) {
+        if (!cancelled) setError(`Die Daten konnten nicht geladen werden: ${e instanceof Error ? e.message : String(e)}`)
+      }
     })()
     return () => {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshKey])
+  }, [refreshKey, retry])
 
   return (
     <section>
       <h1 className="pixel">Lernapp</h1>
-      {data === null ? (
+      {data === null && error ? (
+        <>
+          <p role="alert" className="warn">{error}</p>
+          <button type="button" onClick={() => setRetry((r) => r + 1)}>Erneut versuchen</button>
+        </>
+      ) : data === null ? (
         <p className="muted">Lade …</p>
       ) : (
         <>
