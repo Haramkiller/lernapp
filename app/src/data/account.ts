@@ -60,12 +60,17 @@ export async function clearSignedInMarker(): Promise<void> {
 }
 
 /**
- * Ohne Sitzung beim Start: Liegt es nur am fehlenden Netz (Auffrischen des abgelaufenen Tokens
- * scheiterte vorübergehend, oder das Gerät ist offline) und war man mit dieser Datenbank
- * angemeldet, bleibt man angemeldet und kann offline lernen. Der Sync meldet dann „offline“.
+ * Ohne Sitzung beim Start: Scheiterte nur das Auffrischen des abgelaufenen Tokens am Netz
+ * (auth-js: Sitzung bleibt gespeichert, Fehler ist ein AuthRetryableFetchError) und war man mit
+ * dieser Datenbank angemeldet, bleibt man angemeldet und kann offline lernen.
+ * Ohne Fehlerobjekt ist gar keine Sitzung gespeichert → nicht angemeldet, auch offline.
+ * Online und nicht angemeldet → die Anmeldemarke ist veraltet und wird gelöscht.
  */
 export async function staysSignedInOffline(error: unknown, url: string, online: boolean): Promise<boolean> {
-  if (online && !isAuthRetryableFetchError(error)) return false
+  if (!isAuthRetryableFetchError(error)) {
+    if (online) await clearSignedInMarker()
+    return false
+  }
   const marker = (await db.meta.get(SIGNED_IN_KEY))?.value as Owner | undefined
   return marker?.url === url
 }

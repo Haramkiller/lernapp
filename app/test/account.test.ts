@@ -109,9 +109,9 @@ describe('staysSignedInOffline', () => {
     expect(await staysSignedInOffline(retryable, A.url, true)).toBe(true)
   })
 
-  it('offline ohne Fehlerobjekt + Marke → angemeldet bleiben', async () => {
+  it('offline ohne Fehlerobjekt (keine Sitzung gespeichert) → nicht angemeldet, trotz Marke', async () => {
     await saveSignedInMarker(A)
-    expect(await staysSignedInOffline(null, A.url, false)).toBe(true)
+    expect(await staysSignedInOffline(null, A.url, false)).toBe(false)
   })
 
   it('ohne Marke, mit Marke einer anderen Datenbank oder nach Abmelden → nicht angemeldet', async () => {

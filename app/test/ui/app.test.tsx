@@ -62,13 +62,21 @@ describe('App: Offline-Start', () => {
     expect(screen.queryByRole('heading', { name: 'Anmelden' })).not.toBeInTheDocument()
   })
 
-  it('Gerät offline ohne Fehlerobjekt: Übersicht', async () => {
+  it('Gerät offline + Netzfehler beim Auffrischen: Übersicht mit Offline-Hinweis', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    await saveSignedInMarker({ url: URL_A, userId: 'u1' })
+    const { client } = fakeClient({ data: { session: null }, error: retryable() })
+    render(<App env={env} makeClient={() => client} />)
+    expect(await home()).toBeInTheDocument()
+    expect(await screen.findByText(/Offline/)).toBeInTheDocument()
+  })
+
+  it('Gerät offline ohne Fehlerobjekt (keine Sitzung gespeichert): Anmeldung', async () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
     await saveSignedInMarker({ url: URL_A, userId: 'u1' })
     const { client } = fakeClient({ data: { session: null }, error: null })
     render(<App env={env} makeClient={() => client} />)
-    expect(await home()).toBeInTheDocument()
-    expect(await screen.findByText(/Offline/)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
   })
 
   it('endgültig ungültige Sitzung (online, kein Netzfehler): Anmeldung', async () => {
@@ -76,6 +84,14 @@ describe('App: Offline-Start', () => {
     const { client } = fakeClient({ data: { session: null }, error: new AuthApiError('Invalid Refresh Token', 400, 'refresh_token_not_found') })
     render(<App env={env} makeClient={() => client} />)
     expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+  })
+
+  it('online ohne Sitzung: Anmeldung und veraltete Anmeldemarke wird gelöscht', async () => {
+    await saveSignedInMarker({ url: URL_A, userId: 'u1' })
+    const { client } = fakeClient({ data: { session: null }, error: null })
+    render(<App env={env} makeClient={() => client} />)
+    expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+    await vi.waitFor(async () => expect(await db.meta.get('signedIn')).toBeUndefined())
   })
 
   it('Netzfehler, aber nie angemeldet: Anmeldung', async () => {
@@ -100,6 +116,28 @@ describe('App: Offline-Start', () => {
     await home()
     await vi.waitFor(async () => expect((await db.meta.get('signedIn'))?.value).toEqual({ url: URL_A, userId: 'u1' }))
     expect((await db.meta.get('owner'))?.value).toEqual({ url: URL_A, userId: 'u1' })
+  })
+})
+
+describe('App: Abmelden', () => {
+  it('meldet lokal ab; ein späteres TOKEN_REFRESHED meldet nicht wieder an, erst ein echtes SIGNED_IN', async () => {
+    const { client, auth, emit } = fakeClient({ data: { session: session('u1') }, error: null })
+    // Netzaufruf scheitert: auth-js (scope global) würde die Sitzung behalten und kein SIGNED_OUT senden
+    auth.signOut.mockImplementation(async () => ({ error: retryable() }) as never)
+    render(<App env={env} makeClient={() => client} />)
+    await userEvent.click(await screen.findByRole('button', { name: /Einstellungen/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Abmelden' }))
+    expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+    expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' })
+    expect(await db.meta.get('signedIn')).toBeUndefined()
+
+    emit('TOKEN_REFRESHED', session('u1'))
+    await act(async () => {})
+    await new Promise((r) => setTimeout(r, 50))
+    expect(screen.getByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+
+    emit('SIGNED_IN', session('u1'))
+    expect(await home()).toBeInTheDocument()
   })
 })
 

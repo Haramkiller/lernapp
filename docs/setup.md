@@ -84,7 +84,7 @@ Danach startet die App wie eine normale App und funktioniert auch ohne Internet.
 2. Er öffnet den App-Link und tippt auf der Anmeldeseite unten auf **Eigene Datenbank verwenden**. Auf der Seite **Einrichtung** trägt er bei **Supabase-URL** die Project URL und bei **Öffentlicher Schlüssel** den anon/publishable-Schlüssel seines Projekts ein und klickt **Speichern**; danach erscheint wieder die Anmeldeseite (mit dem Hinweis „Eigene Datenbank: …“). Über denselben Link und **Eingebaute Datenbank verwenden** kommt er zurück zur eingebauten Datenbank. Später ist das auch in den **Einstellungen** im Abschnitt **Eigene Datenbank** möglich (leer lassen = eingebaute Datenbank).
 3. Dann registriert er sich in der App. Seine Daten liegen komplett in seinem Projekt.
 
-Hinweis: Die Lerndaten auf einem Gerät gehören immer zu einem Konto in einer Datenbank. Meldet sich auf dem Gerät ein anderes Konto an oder wird die Datenbank gewechselt, löscht die App die lokalen Daten des vorherigen Kontos (sie liegen weiterhin in dessen Datenbank). Gibt es noch nicht synchronisierte Antworten, fragt die App vorher nach.
+Hinweis: Die Lerndaten auf einem Gerät gehören immer zu einem Konto in einer Datenbank. Meldet sich auf dem Gerät ein anderes Konto an oder wird die Datenbank gewechselt, löscht die App die lokalen Daten des vorherigen Kontos (sie liegen weiterhin in dessen Datenbank). Gibt es noch nicht synchronisierte Antworten, fragt die App vorher nach. Nach dem Abmelden bleiben die lokalen Lerndaten auf dem Gerät, bis sich dort ein anderes Konto anmeldet (dann werden sie gelöscht).
 
 Wer die Werkstatt nutzen will, braucht zusätzlich Abschnitt 3 auf dem eigenen PC mit den eigenen Zugangsdaten.
 

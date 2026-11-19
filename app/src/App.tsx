@@ -50,6 +50,7 @@ export function App({ env = defaultEnv, makeClient = createClient, confirm = (m)
     [config?.url, config?.key], // eslint-disable-line react-hooks/exhaustive-deps
   )
 
+  const signedInRef = useRef<boolean | undefined>(undefined)
   const confirmRef = useRef(confirm)
   confirmRef.current = confirm
 
@@ -57,7 +58,12 @@ export function App({ env = defaultEnv, makeClient = createClient, confirm = (m)
     if (!client || !config) return
     let active = true
     const url = config.url
-    const set = (v: boolean) => active && setSignedIn(v)
+    const set = (v: boolean) => {
+      if (!active) return
+      signedInRef.current = v
+      setSignedIn(v)
+    }
+    signedInRef.current = undefined
     setSignedIn(undefined)
 
     // Angemeldet: Daten gehören diesem Konto (sonst nach Rückfrage leeren), Anmeldemarke für den Offline-Start setzen.
@@ -85,6 +91,8 @@ export function App({ env = defaultEnv, makeClient = createClient, confirm = (m)
         void clearSignedInMarker()
         return set(false)
       }
+      // TOKEN_REFRESHED o. Ä. meldet nicht wieder an, wenn man abgemeldet ist; dafür braucht es ein SIGNED_IN.
+      if (event !== 'SIGNED_IN' && !signedInRef.current) return
       if (session) void enter(session).catch(() => set(false))
     })
     return () => {
@@ -205,8 +213,10 @@ export function App({ env = defaultEnv, makeClient = createClient, confirm = (m)
           onBack={() => setView({ name: 'home' })}
           onOverrideChanged={() => void loadConfig()}
           onLogout={async () => {
-            await client?.auth.signOut()
+            // scope local: auth-js entfernt die gespeicherte Sitzung auch ohne Netz (global bräche vorher ab).
+            await client?.auth.signOut({ scope: 'local' })
             await clearSignedInMarker()
+            signedInRef.current = false
             setSignedIn(false)
             setView({ name: 'home' })
           }}
