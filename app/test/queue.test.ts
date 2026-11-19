@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { State } from 'ts-fsrs'
 import type { Card } from '@lernapp/shared'
 import { newSrsState, type SrsState } from '../src/srs/scheduler'
-import { buildQueue, newDoneKey } from '../src/session/queue'
+import { buildQueue, isDueToday, newDoneKey } from '../src/session/queue'
 
 const now = new Date('2026-11-19T10:00:00')
 const settings = { retention: 0.9, newPerDay: 3 }
@@ -30,7 +31,7 @@ function dueState(stability: number, daysSinceReview: number): SrsState {
   const last = new Date(now.getTime() - daysSinceReview * 86400000)
   return {
     ...newSrsState(last),
-    state: 2,
+    state: State.Review,
     stability,
     difficulty: 5,
     reps: 3,
@@ -113,5 +114,31 @@ describe('Tages-Warteschlange', () => {
     const base = { cards, states: new Map<string, SrsState>(), now: after, settings }
     expect(buildQueue({ ...base, newDoneToday: settings.newPerDay })).toEqual([])
     expect(buildQueue({ ...base, newDoneToday: 0 })).toHaveLength(3)
+  })
+
+  describe('Fälligkeit heute (Lerntag ab 04:00)', () => {
+    const review = (due: string): SrsState => ({ ...dueState(10, 5), due: new Date(due).toISOString() })
+    const q = (st: SrsState, at: Date) =>
+      buildQueue({ cards: [card('c')], states: new Map([['c', st]]), newDoneToday: 0, now: at, settings })
+
+    it('Review-Karte, heute 18:00 fällig, ist um 08:00 in der Queue', () => {
+      expect(q(review('2026-11-19T18:00:00'), new Date('2026-11-19T08:00:00'))).toEqual(['c'])
+    })
+
+    it('Review-Karte, morgen 05:00 fällig: 23:00 nein, morgen 04:00 ja', () => {
+      const st = review('2026-11-20T05:00:00')
+      expect(q(st, new Date('2026-11-19T23:00:00'))).toEqual([])
+      expect(q(st, new Date('2026-11-20T04:00:00'))).toEqual(['c'])
+    })
+
+    it('um 03:30 ist eine Review-Karte mit Fälligkeit 03:50 (gleiche Nacht) in der Queue', () => {
+      expect(q(review('2026-11-20T03:50:00'), new Date('2026-11-20T03:30:00'))).toEqual(['c'])
+    })
+
+    it('Learning-Karte in 10 Minuten fällig ist jetzt nicht in der Queue', () => {
+      const st = { ...review('2026-11-19T10:10:00'), state: State.Learning }
+      expect(isDueToday(st, now)).toBe(false)
+      expect(q(st, now)).toEqual([])
+    })
   })
 })

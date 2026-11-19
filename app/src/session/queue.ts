@@ -1,3 +1,4 @@
+import { State } from 'ts-fsrs'
 import { studyDay, type Card } from '@lernapp/shared'
 import { isDue, recall, type SrsState } from '../srs/scheduler'
 
@@ -6,6 +7,23 @@ export type Settings = { retention: number; newPerDay: number }
 /** Speicherschlüssel des Tageszählers neuer Karten; wechselt um 04:00 Uhr. */
 export function newDoneKey(now: Date): string {
   return 'newDone:' + studyDay(now)
+}
+
+/** Beginn des nächsten Lerntags: nächste 04:00 Uhr lokal nach `now`. */
+function nextStudyDayStart(now: Date): Date {
+  const d = new Date(now)
+  d.setHours(4, 0, 0, 0)
+  if (d.getTime() <= now.getTime()) d.setDate(d.getDate() + 1)
+  return d
+}
+
+/**
+ * Fällig im heutigen Lerntag: Lern-/Wiederholungsschritte (kurze Intervalle) auf die Minute,
+ * Review-Karten, sobald ihr Fälligkeitsdatum vor dem nächsten 04:00-Uhr-Wechsel liegt.
+ */
+export function isDueToday(state: SrsState, now: Date): boolean {
+  if (state.state !== State.Review) return isDue(state, now)
+  return new Date(state.due).getTime() < nextStudyDayStart(now).getTime()
 }
 
 /** Greedy: nächste Karte in Prioritätsreihenfolge mit anderem Thema als die vorige. */
@@ -34,7 +52,7 @@ export function buildQueue(input: {
   const due = live
     .filter((c) => {
       const s = states.get(c.id)
-      return s !== undefined && isDue(s, now)
+      return s !== undefined && isDueToday(s, now)
     })
     .map((c) => ({ card: c, r: recall(states.get(c.id)!, now) }))
     .sort((a, b) => a.r - b.r)
