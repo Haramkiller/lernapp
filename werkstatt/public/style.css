@@ -1,0 +1,35 @@
+:root { color-scheme: dark; --bg:#14161c; --panel:#1d2029; --line:#323746; --text:#e6e8ee; --dim:#9aa1b2; --acc:#6ee7a8; --bad:#ff7b7b; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui, sans-serif; }
+header { display:flex; justify-content:space-between; align-items:baseline; padding:12px 20px; border-bottom:1px solid var(--line); }
+h1 { margin:0; font:700 18px ui-monospace, Consolas, monospace; color:var(--acc); }
+h2 { margin:0 0 10px; font-size:15px; text-transform:uppercase; letter-spacing:.06em; color:var(--dim); }
+main { max-width:900px; margin:0 auto; padding:16px; }
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:14px 16px; margin-bottom:14px; }
+.panel.warn { border-color:#c9a227; }
+.hint, #status { color:var(--dim); font-size:13px; }
+.row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+label { display:block; margin-bottom:8px; }
+.row label { margin:0; }
+input, select, textarea { background:#0f1117; color:var(--text); border:1px solid var(--line); border-radius:4px; padding:6px 8px; font:inherit; }
+input[type=email], input[type=password] { display:block; width:100%; max-width:320px; }
+button { background:var(--acc); color:#0b1a12; border:0; border-radius:4px; padding:7px 14px; font:600 14px inherit; cursor:pointer; }
+button.sec { background:transparent; color:var(--text); border:1px solid var(--line); }
+button:disabled { opacity:.4; cursor:not-allowed; }
+.drop { border:2px dashed var(--line); border-radius:6px; padding:18px; text-align:center; color:var(--dim); }
+.drop.over { border-color:var(--acc); }
+.link { display:inline; color:var(--acc); cursor:pointer; text-decoration:underline; }
+progress { width:260px; }
+.error { color:var(--bad); white-space:pre-wrap; margin:8px 0 0; font:13px/1.4 ui-monospace, Consolas, monospace; }
+.card { border:1px solid var(--line); border-radius:6px; padding:10px 12px; margin:10px 0; }
+.card header { padding:0 0 6px; border:0; display:flex; gap:8px; align-items:center; }
+.tag { font:12px ui-monospace, Consolas, monospace; background:#0f1117; border:1px solid var(--line); border-radius:3px; padding:1px 6px; color:var(--acc); }
+.q { font-weight:600; margin:4px 0; }
+.ans { margin:2px 0 2px 14px; color:var(--text); }
+.ans.ok { color:var(--acc); }
+.why, .expl, .src { color:var(--dim); font-size:13px; }
+.card .actions { margin-left:auto; display:flex; gap:6px; }
+textarea { width:100%; min-height:220px; font:13px/1.4 ui-monospace, Consolas, monospace; }
+.bad-card { border-color:var(--bad); }
+#rejected { border:1px solid var(--bad); border-radius:6px; padding:8px 12px; margin:10px 0; font-size:13px; }
+#rejected li { color:var(--dim); }
