@@ -18,6 +18,7 @@ type Props = {
 
 export function AskDialog({ card, answer, getToken, onClose }: Props) {
   const [mode, setMode] = useState<AskMode | null>(null)
+  const [werkstattError, setWerkstattError] = useState<string | null>(null)
   const userAnswer = describeAnswer(card, answer)
 
   useEffect(() => {
@@ -44,35 +45,31 @@ export function AskDialog({ card, answer, getToken, onClose }: Props) {
           card={card}
           userAnswer={userAnswer}
           getToken={getToken}
-          onFallback={() => {
+          onFallback={(reason) => {
             invalidateAskMode()
+            setWerkstattError(reason ?? null)
             setMode('clipboard')
           }}
         />
       )}
-      {mode === 'clipboard' && <ClipboardAsk text={buildAskText(card, userAnswer)} />}
+      {mode === 'clipboard' && <ClipboardAsk text={buildAskText(card, userAnswer)} werkstattError={werkstattError} />}
     </section>
   )
 }
 
-function ClipboardAsk({ text }: { text: string }) {
+function ClipboardAsk({ text, werkstattError }: { text: string; werkstattError: string | null }) {
   const [copied, setCopied] = useState<boolean | null>(null)
   const area = useRef<HTMLTextAreaElement>(null)
 
-  useEffect(() => {
-    let alive = true
-    void (async () => {
-      try {
-        await navigator.clipboard.writeText(text)
-        if (alive) setCopied(true)
-      } catch {
-        if (alive) setCopied(false)
-      }
-    })()
-    return () => {
-      alive = false
+  // Direkt im Klick-Handler: Nur dort gilt die Nutzeraktion (iOS Safari lehnt sonst ab).
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+    } catch {
+      setCopied(false)
     }
-  }, [text])
+  }
 
   useEffect(() => {
     if (copied === false) area.current?.select()
@@ -80,6 +77,14 @@ function ClipboardAsk({ text }: { text: string }) {
 
   return (
     <div className="stack">
+      {werkstattError && (
+        <p role="alert" className="warn">
+          Werkstatt-Fehler: {werkstattError}
+        </p>
+      )}
+      <button type="button" className="primary" onClick={() => void copy()}>
+        Text kopieren
+      </button>
       {copied === true && <p className="why right">Text kopiert – in Claude einfügen</p>}
       {copied === false && (
         <>
@@ -87,7 +92,7 @@ function ClipboardAsk({ text }: { text: string }) {
           <textarea ref={area} readOnly rows={8} value={text} aria-label="Text zum Kopieren" onFocus={(e) => e.currentTarget.select()} />
         </>
       )}
-      <button type="button" className="primary" onClick={() => window.open(CLAUDE_URL, '_blank', 'noopener')}>
+      <button type="button" onClick={() => window.open(CLAUDE_URL, '_blank', 'noopener')}>
         Claude öffnen
       </button>
     </div>
@@ -99,7 +104,7 @@ type ChatProps = {
   userAnswer: string
   getToken: () => Promise<string | null>
   /** Werkstatt nicht erreichbar: für diese Nachfrage auf Zwischenablage umschalten. */
-  onFallback: () => void
+  onFallback: (reason?: string) => void
 }
 
 function Chat({ card, userAnswer, getToken, onFallback }: ChatProps) {
@@ -123,7 +128,7 @@ function Chat({ card, userAnswer, getToken, onFallback }: ChatProps) {
       setHistory([...next, { role: 'assistant', text: reply }])
     } catch (e) {
       if (e instanceof WerkstattError && e.unreachable) {
-        onFallback()
+        onFallback(e.serverMessage)
         return
       }
       setHistory(history)

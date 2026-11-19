@@ -40,4 +40,19 @@ describe('StudyScreen', () => {
     render(<StudyScreen now={() => NOW} rng={seededRng(1)} onExit={vi.fn()} />)
     expect(await screen.findByText(/Nichts zu lernen/)).toBeInTheDocument()
   })
+
+it('Nachfragen-Dialog gehört zur Karte: weg bei Weiter und beim Beenden', async () => {
+    await db.cards.bulkPut([choiceCard('c1'), choiceCard('c2')])
+    const renderAsk = (card: { id: string }) => <p>Dialog für {card.id}</p>
+    render(<StudyScreen now={() => NOW} rng={seededRng(1)} onExit={vi.fn()} renderAsk={renderAsk} />)
+    await userEvent.click(await screen.findByRole('button', { name: /Richtig B/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Nachfragen' }))
+    expect(screen.getByText(/Dialog für c/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Weiter' }))
+    expect(screen.queryByText(/Dialog für/)).not.toBeInTheDocument()
+    await userEvent.click(await screen.findByRole('button', { name: /Richtig B/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Nachfragen' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Beenden' }))
+    expect(screen.queryByText(/Dialog für/)).not.toBeInTheDocument()
+  })
 })

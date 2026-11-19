@@ -4,10 +4,8 @@ import { resolveSupabaseConfig, type SupabaseConfig } from './data/config'
 import { createSupabaseRemote } from './data/remote'
 import { loadOverride, saveOverride } from './data/settings'
 import { sync } from './data/sync'
-import type { Card } from '@lernapp/shared'
 import { AskDialog } from './ui/AskDialog'
 import { InstallHint } from './ui/InstallHint'
-import type { Answer } from './ui/types'
 import { HomeScreen, type SyncStatus } from './ui/HomeScreen'
 import { LoginScreen, type AuthMode } from './ui/LoginScreen'
 import { SettingsScreen } from './ui/SettingsScreen'
@@ -25,7 +23,6 @@ export function App() {
   const [view, setView] = useState<View>({ name: 'home' })
   const [status, setStatus] = useState<SyncStatus>({ kind: 'idle' })
   const [refreshKey, setRefreshKey] = useState(0)
-  const [asking, setAsking] = useState<{ card: Card; answer: Answer } | null>(null)
 
   const loadConfig = useCallback(async () => {
     setConfig(resolveSupabaseConfig(env, await loadOverride()))
@@ -134,14 +131,13 @@ export function App() {
         <StudyScreen
           moduleId={view.moduleId}
           onFinished={() => void runSync()}
-          onAsk={(card, answer) => setAsking({ card, answer })}
+          renderAsk={(card, answer, close) => <AskDialog key={card.id} card={card} answer={answer} getToken={getToken} onClose={close} />}
           onExit={() => {
             setRefreshKey((k) => k + 1)
             setView({ name: 'home' })
           }}
         />
       )}
-      {asking && <AskDialog card={asking.card} answer={asking.answer} getToken={getToken} onClose={() => setAsking(null)} />}
       {view.name === 'settings' && (
         <SettingsScreen
           onBack={() => setView({ name: 'home' })}

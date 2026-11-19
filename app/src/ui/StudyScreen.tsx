@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { CardDraftSchema, type Card } from '@lernapp/shared'
 import { db } from '../data/db'
 import { loadSettings } from '../data/settings'
@@ -25,8 +25,8 @@ type Props = {
   /** Wird einmal aufgerufen, wenn die Einheit beendet ist (z. B. für den Sync). */
   onFinished?: () => void
   onExit: () => void
-  /** Task 9: „Nachfragen“ zur aktuellen Karte. */
-  onAsk?: (card: Card, answer: Answer) => void
+  /** Task 9: Inhalt des „Nachfragen“-Dialogs; Lebensdauer (Weiter, Beenden, Verlassen) regelt StudyScreen. */
+  renderAsk?: (card: Card, answer: Answer, close: () => void) => ReactNode
   /** Prüft Karten vor dem Lernen; Standard: gemeinsames Schema. Ungültige Karten werden übersprungen. */
   validate?: (card: Card) => boolean
 }
@@ -43,7 +43,7 @@ export function StudyScreen({
   rng = Math.random,
   onFinished,
   onExit,
-  onAsk,
+  renderAsk,
   validate = schemaValid,
 }: Props) {
   const [cards, setCards] = useState<Card[] | null>(null)
@@ -55,6 +55,7 @@ export function StudyScreen({
   const [reload, setReload] = useState(0)
   const [skippedInvalid, setSkippedInvalid] = useState(0)
   const [ended, setEnded] = useState(false)
+  const [asking, setAsking] = useState(false)
   const settings = useRef<Settings | null>(null)
   const states = useRef<Map<string, SrsState>>(new Map())
   const busy = useRef(false)
@@ -166,6 +167,7 @@ export function StudyScreen({
 
   const next = () => {
     setResult(null)
+    setAsking(false)
     setSaveError(null)
     setIndex((i) => i + 1)
   }
@@ -187,11 +189,12 @@ export function StudyScreen({
       )}
       <ErrorBoundary key={card.id} onSkip={next}>
         {result ? (
-          <Feedback card={card} outcome={result.outcome} answer={result.answer} onNext={next} onAsk={onAsk ? () => onAsk(card, result.answer) : undefined} />
+          <Feedback card={card} outcome={result.outcome} answer={result.answer} onNext={next} onAsk={renderAsk ? () => setAsking(true) : undefined} />
         ) : (
           <Question card={card} rng={rng} onAnswer={answer} />
         )}
       </ErrorBoundary>
+      {asking && result && renderAsk?.(card, result.answer, () => setAsking(false))}
     </section>
   )
 }

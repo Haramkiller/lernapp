@@ -17,6 +17,8 @@ export class WerkstattError extends Error {
   constructor(
     message: string,
     readonly unreachable: boolean,
+    /** Fehlertext der Werkstatt bei 5xx (nicht bei Netzwerkfehlern). */
+    readonly serverMessage?: string,
   ) {
     super(message)
   }
@@ -35,7 +37,9 @@ export async function askWerkstatt(card: Card, userAnswer: string, history: Hist
   }
   const body = (await res.json().catch(() => ({}))) as { answer?: string; error?: string }
   if (!res.ok || typeof body.answer !== 'string') {
-    throw new WerkstattError(body.error ?? `Die Werkstatt hat mit Fehler ${res.status} geantwortet.`, res.status >= 500)
+    const message = body.error ?? `Die Werkstatt hat mit Fehler ${res.status} geantwortet.`
+    const server = res.status >= 500
+    throw new WerkstattError(message, server, server ? message : undefined)
   }
   return body.answer
 }
