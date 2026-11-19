@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
-import { runClaude, type SpawnFn } from '../src/claude'
+import { join } from 'node:path'
+import { runClaude, resolveClaude, type SpawnFn, type ResolveDeps } from '../src/claude'
 
-interface Call { cmd: string; args: string[]; stdin: string; killed: boolean; shell: unknown }
+interface Call { cmd: string; args: string[]; stdin: string; killed: boolean; shell: unknown; cwd: unknown }
 
 function fake(opts: { stdout?: string; stderr?: string; code?: number; error?: NodeJS.ErrnoException; hang?: boolean }) {
   const calls: Call[] = []
@@ -14,7 +15,7 @@ function fake(opts: { stdout?: string; stderr?: string; code?: number; error?: N
     child.stdin = new PassThrough()
     let stdin = ''
     child.stdin.on('data', (d: Buffer) => (stdin += d))
-    const rec: Call = { cmd, args, stdin: '', killed: false, shell: (o as any)?.shell }
+    const rec: Call = { cmd, args, stdin: '', killed: false, shell: (o as any)?.shell, cwd: (o as any)?.cwd }
     calls.push(rec)
     child.kill = () => {
       rec.killed = true
@@ -45,15 +46,17 @@ describe('runClaude', () => {
     const out = await runClaude(prompt, { addDir: 'C:/x', spawnFn: f.spawn, command: 'claude' })
     expect(out).toBe('Antwort')
     const c = f.calls[0]!
+    expect(c.args).toEqual(['-p', '--output-format', 'json', '--tools', 'Read', '--allowedTools', 'Read', '--strict-mcp-config', '--add-dir', 'C:/x'])
+    expect(c.cwd).toBe('C:/x')
+    expect(c.shell).toBe(false)
     expect(c.args).toEqual(expect.arrayContaining(['-p', '--output-format', 'json', '--allowedTools', 'Read', '--add-dir', 'C:/x']))
     expect(c.args).not.toContain(prompt)
     expect(c.stdin).toBe(prompt)
-    expect(c.shell).toBeFalsy()
   })
 
   it('nicht installiert → deutsche Meldung', async () => {
     const f = fake({ error: Object.assign(new Error('x'), { code: 'ENOENT' }) })
-    await expect(runClaude('p', { addDir: 'd', spawnFn: f.spawn, command: 'claude' })).rejects.toThrow(/nicht installiert/)
+    await expect(runClaude('p', { addDir: 'd', spawnFn: f.spawn, command: 'claude' })).rejects.toThrow(/nicht gefunden/)
   })
 
   it('nicht angemeldet', async () => {
@@ -70,5 +73,31 @@ describe('runClaude', () => {
     const f = fake({ hang: true })
     await expect(runClaude('p', { addDir: 'd', timeoutMs: 30, spawnFn: f.spawn, command: 'claude' })).rejects.toThrow(/Zeit/)
     expect(f.calls[0]!.killed).toBe(true)
+  })
+})
+
+describe('resolveClaude', () => {
+  const home = join('C:', 'Users', 'u')
+  const deps = (files: string[], env: NodeJS.ProcessEnv = {}): ResolveDeps => ({
+    exists: (p) => files.includes(p),
+    env: { PATH: join('C:', 'bin') + ';' + join('C:', 'other'), USERPROFILE: home, APPDATA: join(home, 'AppData', 'Roaming'), ...env },
+    platform: 'win32',
+    execPath: 'node.exe',
+  })
+
+  it('claude.exe im PATH oder ~/.local/bin', () => {
+    expect(resolveClaude(deps([join('C:', 'other', 'claude.exe')]))).toEqual({ cmd: join('C:', 'other', 'claude.exe'), prefixArgs: [] })
+    const local = join(home, '.local', 'bin', 'claude.exe')
+    expect(resolveClaude(deps([local]))).toEqual({ cmd: local, prefixArgs: [] })
+  })
+
+  it('npm-global: node + cli.js, keine Shell', () => {
+    const npm = join(home, 'AppData', 'Roaming', 'npm')
+    const cli = join(npm, 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js')
+    expect(resolveClaude(deps([join(npm, 'claude.cmd'), cli]))).toEqual({ cmd: 'node.exe', prefixArgs: [cli] })
+  })
+
+  it('nichts gefunden → null', async () => {
+    expect(resolveClaude(deps([]))).toBeNull()
   })
 })

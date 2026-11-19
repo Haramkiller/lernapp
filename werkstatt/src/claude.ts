@@ -15,16 +15,47 @@ export interface RunClaudeOptions {
 
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000
 
-/** Sucht das Claude-CLI im PATH (Windows: .exe bevorzugt, dann .cmd). */
-export function resolveClaude(): { cmd: string; shell: boolean } {
-  const names = process.platform === 'win32' ? ['claude.exe', 'claude.cmd', 'claude.bat'] : ['claude']
-  for (const dir of (process.env.PATH ?? '').split(delimiter).filter(Boolean)) {
-    for (const n of names) {
-      const full = join(dir, n)
-      if (existsSync(full)) return { cmd: full, shell: /\.(cmd|bat)$/i.test(n) }
+export const NOT_FOUND_MESSAGE =
+  'Claude Code nicht gefunden (nicht installiert oder nicht im PATH). Bitte installieren und im Terminal einmal „claude“ starten.'
+
+export interface ResolveDeps {
+  exists: (path: string) => boolean
+  env: NodeJS.ProcessEnv
+  platform: NodeJS.Platform
+  execPath: string
+}
+
+export interface ResolvedClaude {
+  cmd: string
+  /** Argumente, die vor den eigentlichen CLI-Argumenten stehen (z. B. Pfad zu cli.js bei npm-Installation). */
+  prefixArgs: string[]
+}
+
+const realDeps = (): ResolveDeps => ({ exists: existsSync, env: process.env, platform: process.platform, execPath: process.execPath })
+
+/** Findet das Claude-CLI ohne Shell: claude.exe (PATH, ~/.local/bin) oder npm-global cli.js mit node. */
+export function resolveClaude(deps: ResolveDeps = realDeps()): ResolvedClaude | null {
+  const { exists, env, platform } = deps
+  const pathDirs = (env.PATH ?? env.Path ?? '').split(delimiter).filter(Boolean)
+  if (platform !== 'win32') {
+    for (const d of pathDirs) if (exists(join(d, 'claude'))) return { cmd: join(d, 'claude'), prefixArgs: [] }
+    return null
+  }
+  const exts = (env.PATHEXT ?? '.EXE;.CMD').split(';').filter((e) => e.toLowerCase() === '.exe')
+  const dirs = [...pathDirs]
+  if (env.USERPROFILE) dirs.push(join(env.USERPROFILE, '.local', 'bin'))
+  for (const d of dirs) {
+    for (const e of exts.length ? exts : ['.exe']) {
+      const full = join(d, 'claude' + e.toLowerCase())
+      if (exists(full)) return { cmd: full, prefixArgs: [] }
     }
   }
-  return { cmd: 'claude', shell: false }
+  const npmDirs = [...pathDirs.filter((d) => exists(join(d, 'claude.cmd'))), ...(env.APPDATA ? [join(env.APPDATA, 'npm')] : [])]
+  for (const d of npmDirs) {
+    const cli = join(d, 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js')
+    if (exists(cli)) return { cmd: deps.execPath, prefixArgs: [cli] }
+  }
+  return null
 }
 
 class ClaudeError extends Error {}
@@ -43,13 +74,19 @@ function classify(text: string): string | null {
 export function runClaude(prompt: string, opts: RunClaudeOptions): Promise<string> {
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const spawn = opts.spawnFn ?? (nodeSpawn as SpawnFn)
-  const resolved = opts.command ? { cmd: opts.command, shell: false } : resolveClaude()
-  // Der Prompt geht über stdin (kein Argv-Limit, keine Shell-Interpretation).
-  const args = ['-p', '--output-format', 'json', '--allowedTools', 'Read', '--add-dir', opts.addDir]
-  if (resolved.shell && /[&|<>^%"\r\n]/.test(opts.addDir)) {
-    return Promise.reject(new Error('Ungültiger Verzeichnispfad für Claude.'))
-  }
-  const shellArgs = resolved.shell ? args.map((a) => (/\s/.test(a) ? `"${a}"` : a)) : args
+  const resolved = opts.command ? { cmd: opts.command, prefixArgs: [] as string[] } : resolveClaude()
+  if (!resolved) return Promise.reject(new Error(NOT_FOUND_MESSAGE))
+  // Prompt über stdin (kein Argv-Limit, keine Shell). PDF-Inhalt ist nicht vertrauenswürdig:
+  // nur das Read-Werkzeug, keine MCP-Server des Nutzers, Arbeitsverzeichnis = Abschnittsordner.
+  const args = [
+    ...resolved.prefixArgs,
+    '-p',
+    '--output-format', 'json',
+    '--tools', 'Read',
+    '--allowedTools', 'Read',
+    '--strict-mcp-config',
+    '--add-dir', opts.addDir,
+  ]
 
   return new Promise<string>((resolve, reject) => {
     let settled = false
@@ -61,7 +98,7 @@ export function runClaude(prompt: string, opts: RunClaudeOptions): Promise<strin
     }
     let child: ChildProcess
     try {
-      child = spawn(resolved.cmd, shellArgs, { shell: resolved.shell, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
+      child = spawn(resolved.cmd, args, { shell: false, cwd: opts.addDir, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
     } catch (e) {
       return reject(spawnFailure(e))
     }
@@ -91,7 +128,7 @@ export function runClaude(prompt: string, opts: RunClaudeOptions): Promise<strin
 
 function spawnFailure(e: unknown): Error {
   if ((e as NodeJS.ErrnoException)?.code === 'ENOENT') {
-    return new Error('Claude Code ist nicht installiert oder nicht im PATH. Bitte installieren und im Terminal einmal „claude“ starten.')
+    return new Error(NOT_FOUND_MESSAGE)
   }
   return new Error(`Claude konnte nicht gestartet werden: ${(e as Error)?.message ?? e}`)
 }
