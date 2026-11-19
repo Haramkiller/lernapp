@@ -1,11 +1,19 @@
 import { useState, type FormEvent } from 'react'
 import type { SupabaseConfig } from '../data/config'
 
-type Props = { onSave: (config: SupabaseConfig) => void | Promise<void> }
+type Props = {
+  onSave: (config: SupabaseConfig) => void | Promise<void>
+  /** Bereits eingetragene eigene Datenbank (zum Bearbeiten). */
+  initial?: SupabaseConfig | null
+  /** Zurück zur Anmeldung (nur wenn es eine eingebaute oder gespeicherte Datenbank gibt). */
+  onBack?: () => void
+  /** Eigene Datenbank entfernen und die eingebaute verwenden. */
+  onReset?: () => void | Promise<void>
+}
 
-export function SetupScreen({ onSave }: Props) {
-  const [url, setUrl] = useState('')
-  const [key, setKey] = useState('')
+export function SetupScreen({ onSave, initial, onBack, onReset }: Props) {
+  const [url, setUrl] = useState(initial?.url ?? '')
+  const [key, setKey] = useState(initial?.key ?? '')
   const [error, setError] = useState<string | null>(null)
 
   const submit = (e: FormEvent) => {
@@ -35,9 +43,21 @@ export function SetupScreen({ onSave }: Props) {
         <input type="text" autoComplete="off" value={key} onChange={(e) => setKey(e.target.value)} />
       </label>
       {error && <p role="alert" className="warn">{error}</p>}
-      <button type="submit" className="primary">
-        Speichern
-      </button>
+      <div className="row">
+        <button type="submit" className="primary">
+          Speichern
+        </button>
+        {onBack && (
+          <button type="button" onClick={onBack}>
+            Zurück
+          </button>
+        )}
+      </div>
+      {onReset && (
+        <button type="button" className="link" onClick={() => void onReset()}>
+          Eingebaute Datenbank verwenden
+        </button>
+      )}
     </form>
   )
 }

@@ -26,7 +26,7 @@ Diese Anleitung ist für Menschen ohne Programmierkenntnisse gedacht. Du brauchs
 
 1. Lege auf <https://github.com> ein Konto an (falls noch nicht vorhanden) und erstelle ein neues Repository, z. B. `lernapp`. Wähle **public** (siehe Kasten unten).
 
-   > **Wichtig: öffentliches Repository.** GitHub Pages mit einem kostenlosen Konto funktioniert nur mit einem **öffentlichen** Repository. Folge: Code, Dokumentation (auch der Entwurf unter `docs/superpowers`) und die gesamte Commit-Historie sind für jeden im Internet lesbar. Committe daher **niemals** Passwörter, Schlüssel oder persönliche Dateien. Skripte und Klausur-PDFs bleiben lokal auf deinem PC; die Datei `.env` ist aus genau diesem Grund von Git ausgeschlossen. Der anon/publishable-Schlüssel ist von Haus aus öffentlich (er steckt in der fertigen App). Deine Daten schützt die Zugriffsregel „Row Level Security“ aus `schema.sql` – deshalb muss `schema.sql` **vollständig** ausgeführt worden sein (Abschnitt 1, Schritt 4).
+   > **Wichtig: öffentliches Repository.** GitHub Pages mit einem kostenlosen Konto funktioniert nur mit einem **öffentlichen** Repository. Folge: Code, Dokumentation (auch der Entwurf unter `docs/superpowers`) und die gesamte Commit-Historie sind für jeden im Internet lesbar. Committe daher **niemals** Passwörter, Schlüssel oder persönliche Dateien. Skripte und Klausur-PDFs bleiben lokal auf deinem PC; die Datei `.env` ist aus genau diesem Grund von Git ausgeschlossen. Der anon/publishable-Schlüssel ist von Haus aus öffentlich (er steckt in der fertigen App). Deine Daten schützt die Zugriffsregel „Row Level Security“ aus `schema.sql` – deshalb muss `schema.sql` **vollständig** ausgeführt worden sein (Abschnitt 1, Schritt 4). Außerdem kann sich jeder, der den App-Link kennt, auf deinem Supabase-Projekt registrieren, solange du in Supabase nicht **Allow new users to sign up** ausschaltest (siehe Abschnitt 5, Variante A).
 2. **Wichtig vor dem ersten Push:** Damit deine private E-Mail-Adresse nicht in der Git-Historie landet, stelle im Projektordner die GitHub-„noreply“-Adresse ein. Du findest sie unter GitHub → **Settings** → **Emails** (Haken bei „Keep my email addresses private“ setzen, die Adresse wird dort angezeigt):
 
    ```
@@ -81,8 +81,10 @@ Danach startet die App wie eine normale App und funktioniert auch ohne Internet.
 
 **Variante B: eigene Datenbank (unabhängig).**
 1. Dein Freund legt ein eigenes Supabase-Projekt an und führt `supabase/schema.sql` im SQL Editor aus (Abschnitt 1, Schritte 1 bis 7).
-2. Er öffnet den App-Link. Auf der Seite **Einrichtung** trägt er bei **Supabase-URL** die Project URL und bei **Öffentlicher Schlüssel** den anon/publishable-Schlüssel seines Projekts ein und klickt **Speichern**. Später ist das auch in den **Einstellungen** im Abschnitt **Eigene Datenbank** möglich (leer lassen = eingebaute Datenbank).
+2. Er öffnet den App-Link und tippt auf der Anmeldeseite unten auf **Eigene Datenbank verwenden**. Auf der Seite **Einrichtung** trägt er bei **Supabase-URL** die Project URL und bei **Öffentlicher Schlüssel** den anon/publishable-Schlüssel seines Projekts ein und klickt **Speichern**; danach erscheint wieder die Anmeldeseite (mit dem Hinweis „Eigene Datenbank: …“). Über denselben Link und **Eingebaute Datenbank verwenden** kommt er zurück zur eingebauten Datenbank. Später ist das auch in den **Einstellungen** im Abschnitt **Eigene Datenbank** möglich (leer lassen = eingebaute Datenbank).
 3. Dann registriert er sich in der App. Seine Daten liegen komplett in seinem Projekt.
+
+Hinweis: Die Lerndaten auf einem Gerät gehören immer zu einem Konto in einer Datenbank. Meldet sich auf dem Gerät ein anderes Konto an oder wird die Datenbank gewechselt, löscht die App die lokalen Daten des vorherigen Kontos (sie liegen weiterhin in dessen Datenbank). Gibt es noch nicht synchronisierte Antworten, fragt die App vorher nach.
 
 Wer die Werkstatt nutzen will, braucht zusätzlich Abschnitt 3 auf dem eigenen PC mit den eigenen Zugangsdaten.
 

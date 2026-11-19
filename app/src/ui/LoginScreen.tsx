@@ -5,9 +5,13 @@ export type AuthMode = 'signIn' | 'signUp'
 type Props = {
   /** Wirft bei Fehlern; ein zurückgegebener Text wird als Hinweis angezeigt. */
   onSubmit: (mode: AuthMode, email: string, password: string) => Promise<string | void>
+  /** Adresse der eigenen Datenbank, falls eine eingetragen ist (sonst eingebaute). */
+  database?: string
+  /** Öffnet die Einrichtung für eine eigene Datenbank. */
+  onUseOwnDatabase?: () => void
 }
 
-export function LoginScreen({ onSubmit }: Props) {
+export function LoginScreen({ onSubmit, database, onUseOwnDatabase }: Props) {
   const [mode, setMode] = useState<AuthMode>('signIn')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -56,6 +60,12 @@ export function LoginScreen({ onSubmit }: Props) {
       <button type="button" className="link" onClick={() => setMode(mode === 'signIn' ? 'signUp' : 'signIn')}>
         {mode === 'signIn' ? 'Noch kein Konto? Registrieren' : 'Schon ein Konto? Anmelden'}
       </button>
+      {database && <p className="muted">Eigene Datenbank: {database}</p>}
+      {onUseOwnDatabase && (
+        <button type="button" className="link" onClick={onUseOwnDatabase}>
+          Eigene Datenbank verwenden
+        </button>
+      )}
     </form>
   )
 }

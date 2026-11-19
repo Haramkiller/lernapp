@@ -10,7 +10,7 @@ export type OutboxEntry =
   | { id?: number; kind: 'log'; payload: LogEntry }
 /** Dauerhaft abgelehnte Outbox-Einträge (4xx): Quarantäne, damit der Rest weiter synchronisiert. */
 export type DeadEntry = { id?: number; kind: 'state' | 'log'; payload: StateRow | LogEntry; error: string }
-/** Schlüssel: `lastPull:<tabelle>`, `settings`, `supabaseOverride`, `newDone:<studyDay>`. */
+/** Schlüssel: `lastPull:<tabelle>`, `settings`, `supabaseOverride`, `newDone:<studyDay>`, `owner`, `signedIn` (siehe account.ts). */
 export type MetaEntry = { key: string; value: unknown }
 
 export class LernDb extends Dexie {

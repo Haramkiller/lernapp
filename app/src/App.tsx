@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js'
+import { clearSignedInMarker, ensureOwner, saveSignedInMarker, staysSignedInOffline } from './data/account'
 import { resolveSupabaseConfig, type SupabaseConfig } from './data/config'
 import { createSupabaseRemote } from './data/remote'
 import { loadOverride, saveOverride } from './data/settings'
@@ -14,36 +15,83 @@ import { StudyScreen } from './ui/StudyScreen'
 
 type View = { name: 'home' } | { name: 'study'; moduleId?: string } | { name: 'settings' }
 
-const env = { url: import.meta.env.VITE_SUPABASE_URL as string | undefined, key: import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined }
+const defaultEnv = { url: import.meta.env.VITE_SUPABASE_URL as string | undefined, key: import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined }
 
-export function App() {
+type Props = {
+  /** Eingebaute Datenbank (Build-Variablen); für Tests austauschbar. */
+  env?: { url?: string; key?: string }
+  makeClient?: (url: string, key: string) => SupabaseClient
+  /** Rückfrage vor dem Verwerfen nicht synchronisierter Daten eines anderen Kontos. */
+  confirm?: (message: string) => boolean
+}
+
+export function App({ env = defaultEnv, makeClient = createClient, confirm = (m) => window.confirm(m) }: Props = {}) {
   // undefined = wird geladen
   const [config, setConfig] = useState<SupabaseConfig | null | undefined>(undefined)
+  const [override, setOverride] = useState<SupabaseConfig | null>(null)
+  const [setupOpen, setSetupOpen] = useState(false)
   const [signedIn, setSignedIn] = useState<boolean | undefined>(undefined)
   const [view, setView] = useState<View>({ name: 'home' })
   const [status, setStatus] = useState<SyncStatus>({ kind: 'idle' })
   const [refreshKey, setRefreshKey] = useState(0)
 
   const loadConfig = useCallback(async () => {
-    setConfig(resolveSupabaseConfig(env, await loadOverride()))
-  }, [])
+    const o = await loadOverride()
+    setOverride(o)
+    setConfig(resolveSupabaseConfig(env, o))
+  }, [env.url, env.key]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     void loadConfig()
   }, [loadConfig])
 
   // Der Client wird nur neu gebaut, wenn sich URL oder Schlüssel ändern.
   const client = useMemo(
-    () => (config ? createClient(config.url, config.key) : null),
+    () => (config ? makeClient(config.url, config.key) : null),
     [config?.url, config?.key], // eslint-disable-line react-hooks/exhaustive-deps
   )
 
+  const confirmRef = useRef(confirm)
+  confirmRef.current = confirm
+
   useEffect(() => {
-    if (!client) return
+    if (!client || !config) return
+    let active = true
+    const url = config.url
+    const set = (v: boolean) => active && setSignedIn(v)
     setSignedIn(undefined)
-    void client.auth.getSession().then(({ data }) => setSignedIn(data.session !== null))
-    const { data } = client.auth.onAuthStateChange((_event, session) => setSignedIn(session !== null))
-    return () => data.subscription.unsubscribe()
-  }, [client])
+
+    // Angemeldet: Daten gehören diesem Konto (sonst nach Rückfrage leeren), Anmeldemarke für den Offline-Start setzen.
+    const enter = async (session: Session) => {
+      const owner = { url, userId: session.user.id }
+      if (!(await ensureOwner(owner, confirmRef.current))) {
+        await client.auth.signOut({ scope: 'local' })
+        return set(false)
+      }
+      await saveSignedInMarker(owner)
+      set(true)
+    }
+
+    void (async () => {
+      const { data, error } = await client.auth.getSession()
+      if (data.session) return enter(data.session)
+      // Abgelaufenes Token und kein Netz: auth-js liefert null + Netzfehler. Offline weiterlernen.
+      set(await staysSignedInOffline(error, url, navigator.onLine))
+    })().catch(() => set(false))
+
+    const { data } = client.auth.onAuthStateChange((event, session) => {
+      // INITIAL_SESSION entspricht getSession oben; sein null unterscheidet nicht zwischen offline und abgemeldet.
+      if (event === 'INITIAL_SESSION') return
+      if (event === 'SIGNED_OUT') {
+        void clearSignedInMarker()
+        return set(false)
+      }
+      if (session) void enter(session).catch(() => set(false))
+    })
+    return () => {
+      active = false
+      data.subscription.unsubscribe()
+    }
+  }, [client]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const running = useRef(false)
   const runSync = useCallback(async () => {
@@ -94,14 +142,28 @@ export function App() {
   }
 
   if (config === undefined) return <main className="app"><p className="muted">Lade …</p></main>
-  if (config === null) {
+  if (config === null || (setupOpen && !signedIn)) {
+    const close = async () => {
+      setSetupOpen(false)
+      await loadConfig()
+    }
     return (
       <main className="app">
         <SetupScreen
+          initial={override}
           onSave={async (c) => {
             await saveOverride(c)
-            await loadConfig()
+            await close()
           }}
+          onBack={config ? () => setSetupOpen(false) : undefined}
+          onReset={
+            override && env.url && env.key
+              ? async () => {
+                  await saveOverride(null)
+                  await close()
+                }
+              : undefined
+          }
         />
       </main>
     )
@@ -110,7 +172,7 @@ export function App() {
   if (!signedIn) {
     return (
       <main className="app">
-        <LoginScreen onSubmit={authenticate} />
+        <LoginScreen onSubmit={authenticate} database={override?.url} onUseOwnDatabase={() => setSetupOpen(true)} />
       </main>
     )
   }
@@ -144,6 +206,8 @@ export function App() {
           onOverrideChanged={() => void loadConfig()}
           onLogout={async () => {
             await client?.auth.signOut()
+            await clearSignedInMarker()
+            setSignedIn(false)
             setView({ name: 'home' })
           }}
         />
