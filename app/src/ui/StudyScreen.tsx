@@ -5,7 +5,7 @@ import { loadSettings } from '../data/settings'
 import { recordReview } from '../data/sync'
 import { buildQueue, newDoneKey, type Settings } from '../session/queue'
 import { toRating, type Outcome } from '../srs/grading'
-import { newSrsState, review, type SrsState } from '../srs/scheduler'
+import { newSrsState, review } from '../srs/scheduler'
 import { ErrorBoundary } from './ErrorBoundary'
 import { Feedback } from './Feedback'
 import { Choice } from './questions/Choice'
@@ -57,7 +57,6 @@ export function StudyScreen({
   const [ended, setEnded] = useState(false)
   const [asking, setAsking] = useState(false)
   const settings = useRef<Settings | null>(null)
-  const states = useRef<Map<string, SrsState>>(new Map())
   const busy = useRef(false)
   const finished = useRef(false)
 
@@ -72,13 +71,12 @@ export function StudyScreen({
         const map = new Map(rows.map((r) => [r.cardId, r.state]))
         const newDoneToday = ((await db.meta.get(newDoneKey(t)))?.value as number | undefined) ?? 0
         const inScope = all.filter((c) => !c.deleted && (moduleId === undefined || c.moduleId === moduleId))
-        const valid = all.filter((c) => validate(c))
+        const valid = inScope.filter((c) => validate(c))
         const ids = buildQueue({ cards: valid, states: map, newDoneToday, now: t, settings: s, moduleId }).slice(0, UNIT_SIZE)
         const byId = new Map(valid.map((c) => [c.id, c]))
         if (cancelled) return
         settings.current = s
-        states.current = map
-        setSkippedInvalid(inScope.filter((c) => !validate(c)).length)
+        setSkippedInvalid(inScope.length - valid.length)
         setCards(ids.map((id) => byId.get(id)!))
       } catch (e) {
         if (!cancelled) setLoadError(`Die Karten konnten nicht geladen werden: ${message(e)}`)
@@ -152,10 +150,9 @@ export function StudyScreen({
     setSaveError(null)
     try {
       const t = now()
-      const prev = states.current.get(card.id) ?? newSrsState(t)
-      const next = review(prev, toRating(outcome), t, { cardId: card.id, retention: settings.current!.retention })
-      await recordReview(card.id, next)
-      states.current.set(card.id, next.state)
+      const retention = settings.current!.retention
+      // Der Ausgangs-State wird beim Speichern frisch aus der Datenbank gelesen (ein Sync kann ihn geändert haben).
+      await recordReview(card.id, (prev) => review(prev ?? newSrsState(t), toRating(outcome), t, { cardId: card.id, retention }))
       setCounts((c) => ({ ...c, [outcome]: c[outcome] + 1 }))
       setResult({ outcome, answer: detail })
     } catch (e) {

@@ -31,7 +31,7 @@ describe('Einheit vorzeitig beenden', () => {
     const onFinished = vi.fn()
     render(<StudyScreen now={() => NOW} rng={seededRng(1)} onFinished={onFinished} onExit={vi.fn()} />)
     await userEvent.click(await screen.findByRole('button', { name: /Richtig B/ }))
-    await userEvent.click(screen.getByRole('button', { name: 'Weiter' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Weiter' }))
     expect(onFinished).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'Beenden' }))
     expect(await screen.findByText(/1 richtig, 0 teilweise, 0 falsch/)).toBeInTheDocument()

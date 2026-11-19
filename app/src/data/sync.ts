@@ -3,29 +3,36 @@ import { isPermanentError, type Cursors, type Remote, type SyncTable } from './r
 import type { ReviewLog, SrsState } from '../srs/scheduler'
 import { newDoneKey } from '../session/queue'
 
+type ReviewResult = { state: SrsState; log: ReviewLog }
+
 /**
  * Speichert eine Wiederholung atomar: State, Outbox-Einträge (State + Log) und Tageszähler
  * neuer Karten. "Neu" heißt: für die Karte gab es bisher keinen State.
+ *
+ * `compute` erhält den aktuellen State aus der Datenbank (innerhalb der Transaktion), damit ein
+ * zwischenzeitlicher Sync nicht von einem veralteten Stand überschrieben wird.
  */
 export async function recordReview(
   cardId: string,
-  result: { state: SrsState; log: ReviewLog },
-): Promise<void> {
-  const { state, log } = result
-  const row: StateRow = { cardId, state, updatedAt: log.reviewedAt }
-  const entry: LogEntry = { ...log, cardId, id: crypto.randomUUID() }
-  await db.transaction('rw', db.states, db.outbox, db.meta, async () => {
-    const wasNew = (await db.states.get(cardId)) === undefined
+  compute: ReviewResult | ((prev: SrsState | undefined) => ReviewResult),
+): Promise<ReviewResult> {
+  return db.transaction('rw', db.states, db.outbox, db.meta, async () => {
+    const prev = (await db.states.get(cardId))?.state
+    const result = typeof compute === 'function' ? compute(prev) : compute
+    const { state, log } = result
+    const row: StateRow = { cardId, state, updatedAt: log.reviewedAt }
+    const entry: LogEntry = { ...log, cardId, id: crypto.randomUUID() }
     await db.states.put(row)
     await db.outbox.bulkAdd([
       { kind: 'state', payload: row },
       { kind: 'log', payload: entry },
     ])
-    if (wasNew) {
+    if (prev === undefined) {
       const key = newDoneKey(new Date(log.reviewedAt))
       const done = ((await db.meta.get(key))?.value as number | undefined) ?? 0
       await db.meta.put({ key, value: done + 1 })
     }
+    return result
   })
 }
 
