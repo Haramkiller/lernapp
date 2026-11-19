@@ -1,8 +1,10 @@
-const EDGE_PUNCT = /^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu
+// Nur Satzzeichen (\p{P}) am Rand entfernen; Symbole (+, °, ...) und % bleiben, sie tragen Bedeutung (Na+, 50%).
+const EDGE_PUNCT = /^[^\P{P}%‰]+|[^\P{P}%‰]+$/gu
 
-/** Vergleichsform für Antworten: trim, klein, Leerraum gefaltet, Umlaute ausgeschrieben, Randzeichen entfernt. */
+/** Vergleichsform für Antworten: NFC, trim, klein, Leerraum gefaltet, Umlaute ausgeschrieben, Randsatzzeichen entfernt. */
 export function normalize(s: string): string {
   return s
+    .normalize('NFC')
     .trim()
     .toLowerCase()
     .replace(/ä/g, 'ae')
