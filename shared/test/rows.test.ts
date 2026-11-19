@@ -54,4 +54,12 @@ describe('rows', () => {
     const log = { id: 'l1', cardId: 'c1', rating: 3 as const, reviewedAt: 'r', studyDay: '2026-01-01', elapsedDays: 2 }
     expect(logToRow(log)).toEqual({ id: 'l1', card_id: 'c1', rating: 3, reviewed_at: 'r', study_day: '2026-01-01', elapsed_days: 2 })
   })
+
+  it('normalisiert Postgres-Zeitstempel (+01:00, +00:00, Mikrosekunden) auf ISO-UTC', () => {
+    expect(rowToState({ card_id: 'c', state: 1, updated_at: '2026-03-10T11:00:00+01:00' }).updatedAt).toBe('2026-03-10T10:00:00.000Z')
+    expect(rowToTopic({ id: 't', module_id: 'm', name: 'n', updated_at: '2026-03-10T10:00:00.123456+00:00' }).updatedAt).toBe('2026-03-10T10:00:00.123Z')
+    const r = { ...cardToRow(card), updated_at: '2026-01-02T01:00:00+01:00', created_at: '2026-01-01T01:00:00+01:00' }
+    expect(rowToCard(r)).toEqual(card)
+    expect(rowToModule({ id: 'm', name: 'n', exam_date: null, style_profile: null, updated_at: '2026-01-01T01:00:00+01:00' }).updatedAt).toBe('2026-01-01T00:00:00.000Z')
+  })
 })

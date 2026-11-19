@@ -65,6 +65,9 @@ export type LogRow = {
   elapsed_days: number
 }
 
+/** Normalisiert Postgres-Zeitstempel (+00:00, +01:00, Mikrosekunden) auf ISO-UTC mit Millisekunden. */
+export const isoUtc = (s: string): string => new Date(s).toISOString()
+
 export const moduleToRow = (m: Module): ModuleRow => ({
   id: m.id,
   name: m.name,
@@ -77,7 +80,7 @@ export const rowToModule = (r: ModuleRow): Module => ({
   name: r.name,
   examDate: r.exam_date,
   styleProfile: r.style_profile,
-  updatedAt: r.updated_at,
+  updatedAt: isoUtc(r.updated_at),
 })
 
 export const topicToRow = (t: Topic): TopicRow => ({
@@ -90,7 +93,7 @@ export const rowToTopic = (r: TopicRow): Topic => ({
   id: r.id,
   moduleId: r.module_id,
   name: r.name,
-  updatedAt: r.updated_at,
+  updatedAt: isoUtc(r.updated_at),
 })
 
 export const cardToRow = (c: Card): CardRow => ({
@@ -120,8 +123,8 @@ export const rowToCard = (r: CardRow): Card =>
     examRelevant: r.exam_relevant,
     fromExam: r.from_exam,
     difficulty: r.difficulty,
-    createdAt: r.created_at,
-    updatedAt: r.updated_at,
+    createdAt: isoUtc(r.created_at),
+    updatedAt: isoUtc(r.updated_at),
     deleted: r.deleted,
   }) as Card
 
@@ -133,7 +136,7 @@ export const stateToRow = <S>(s: StateEntry<S>): StateDbRow<S> => ({
 export const rowToState = <S>(r: StateDbRow<S>): StateEntry<S> => ({
   cardId: r.card_id,
   state: r.state,
-  updatedAt: r.updated_at,
+  updatedAt: isoUtc(r.updated_at),
 })
 
 export const logToRow = (l: LogInput): LogRow => ({

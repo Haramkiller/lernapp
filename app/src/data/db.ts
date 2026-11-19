@@ -8,7 +8,9 @@ export type LogEntry = ReviewLog & { id: string }
 export type OutboxEntry =
   | { id?: number; kind: 'state'; payload: StateRow }
   | { id?: number; kind: 'log'; payload: LogEntry }
-/** Schlüssel: `lastPull`, `settings`, `supabaseOverride`, `newDone:<studyDay>`. */
+/** Dauerhaft abgelehnte Outbox-Einträge (4xx): Quarantäne, damit der Rest weiter synchronisiert. */
+export type DeadEntry = { id?: number; kind: 'state' | 'log'; payload: StateRow | LogEntry; error: string }
+/** Schlüssel: `lastPull:<tabelle>`, `settings`, `supabaseOverride`, `newDone:<studyDay>`. */
 export type MetaEntry = { key: string; value: unknown }
 
 export class LernDb extends Dexie {
@@ -18,6 +20,7 @@ export class LernDb extends Dexie {
   states!: Table<StateRow, string>
   outbox!: Table<OutboxEntry, number>
   meta!: Table<MetaEntry, string>
+  dead!: Table<DeadEntry, number>
 
   constructor() {
     super('lernapp')
@@ -29,6 +32,7 @@ export class LernDb extends Dexie {
       outbox: '++id',
       meta: 'key',
     })
+    this.version(2).stores({ dead: '++id' })
   }
 }
 

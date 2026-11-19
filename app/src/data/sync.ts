@@ -1,5 +1,5 @@
 import { db, type LogEntry, type OutboxEntry, type StateRow } from './db'
-import type { Remote } from './remote'
+import { isPermanentError, type Cursors, type Remote, type SyncTable } from './remote'
 import type { ReviewLog, SrsState } from '../srs/scheduler'
 import { newDoneKey } from '../session/queue'
 
@@ -29,36 +29,77 @@ export async function recordReview(
   })
 }
 
-async function pushOutbox(remote: Remote): Promise<number> {
-  const entries = (await db.outbox.toArray()) as (OutboxEntry & { id: number })[]
-  if (entries.length === 0) return 0
+type Unit<T> = { ids: number[]; item: T }
 
-  // Pro Karte zählt nur der neueste State (ein Upsert mit doppeltem Schlüssel wäre ein Fehler).
-  const latest = new Map<string, StateRow>()
-  const stateIds: number[] = []
-  const logs: LogEntry[] = []
-  const logIds: number[] = []
+/** Verschiebt dauerhaft abgelehnte Einträge in die Quarantäne (`dead`). */
+async function quarantine(ids: number[], error: unknown): Promise<void> {
+  const message = error instanceof Error ? error.message : String(error)
+  await db.transaction('rw', db.outbox, db.dead, async () => {
+    const entries = (await db.outbox.bulkGet(ids)).filter((e): e is OutboxEntry => e !== undefined)
+    await db.dead.bulkAdd(entries.map((e) => ({ kind: e.kind, payload: e.payload, error: message })))
+    await db.outbox.bulkDelete(ids)
+  })
+}
+
+/**
+ * Schickt Einheiten als Batch. Erfolg → Outbox-Einträge löschen. Vorübergehender Fehler
+ * (Netz/5xx) → alles behalten und abbrechen. Dauerhafter Fehler (4xx) → Einheiten einzeln
+ * wiederholen, um den schädlichen Eintrag zu isolieren und in Quarantäne zu legen.
+ */
+async function pushUnits<T>(
+  units: Unit<T>[],
+  push: (items: T[]) => Promise<void>,
+): Promise<{ pushed: number; error?: unknown }> {
+  if (units.length === 0) return { pushed: 0 }
+  const count = (us: Unit<T>[]) => us.reduce((n, u) => n + u.ids.length, 0)
+  try {
+    await push(units.map((u) => u.item))
+    await db.outbox.bulkDelete(units.flatMap((u) => u.ids))
+    return { pushed: count(units) }
+  } catch (e) {
+    if (!isPermanentError(e)) return { pushed: 0, error: e }
+    if (units.length === 1) {
+      await quarantine(units[0]!.ids, e)
+      return { pushed: 0 }
+    }
+  }
+  let pushed = 0
+  for (const u of units) {
+    try {
+      await push([u.item])
+      await db.outbox.bulkDelete(u.ids)
+      pushed += u.ids.length
+    } catch (e) {
+      if (!isPermanentError(e)) return { pushed, error: e }
+      await quarantine(u.ids, e)
+    }
+  }
+  return { pushed }
+}
+
+async function pushOutbox(remote: Remote): Promise<{ pushed: number; error?: unknown }> {
+  const entries = (await db.outbox.toArray()) as (OutboxEntry & { id: number })[]
+
+  // Pro Karte zählt nur der neueste State; die älteren Einträge gehen mit derselben Einheit raus.
+  const byCard = new Map<string, Unit<StateRow>>()
+  const logUnits: Unit<LogEntry>[] = []
   for (const e of entries) {
-    if (e.kind === 'state') {
-      stateIds.push(e.id)
-      const prev = latest.get(e.payload.cardId)
-      if (!prev || prev.updatedAt <= e.payload.updatedAt) latest.set(e.payload.cardId, e.payload)
-    } else {
-      logIds.push(e.id)
-      logs.push(e.payload)
+    if (e.kind === 'log') {
+      logUnits.push({ ids: [e.id], item: e.payload })
+      continue
+    }
+    const unit = byCard.get(e.payload.cardId)
+    if (!unit) byCard.set(e.payload.cardId, { ids: [e.id], item: e.payload })
+    else {
+      unit.ids.push(e.id)
+      if (Date.parse(e.payload.updatedAt) >= Date.parse(unit.item.updatedAt)) unit.item = e.payload
     }
   }
 
-  // Erst nach erfolgreichem Remote-Aufruf löschen; bei Fehler bleiben die Einträge erhalten.
-  if (latest.size > 0) {
-    await remote.pushStates([...latest.values()])
-    await db.outbox.bulkDelete(stateIds)
-  }
-  if (logs.length > 0) {
-    await remote.pushLogs(logs)
-    await db.outbox.bulkDelete(logIds)
-  }
-  return stateIds.length + logIds.length
+  const states = await pushUnits([...byCard.values()], (s) => remote.pushStates(s))
+  if (states.error) return states
+  const logs = await pushUnits(logUnits, (l) => remote.pushLogs(l))
+  return { pushed: states.pushed + logs.pushed, error: logs.error }
 }
 
 /** Übernimmt Zeilen nur, wenn sie neuer sind als die lokale Fassung; liefert die Anzahl übernommener. */
@@ -70,25 +111,33 @@ async function applyNewer<T extends { updatedAt: string }>(
   let applied = 0
   for (const item of items) {
     const local = await getLocal(item)
-    if (local && local.updatedAt >= item.updatedAt) continue
+    if (local && Date.parse(local.updatedAt) >= Date.parse(item.updatedAt)) continue
     await put(item)
     applied++
   }
   return applied
 }
 
-export async function sync(remote: Remote, _now: Date): Promise<{ pushed: number; pulled: number }> {
-  // `_now` bleibt in der Signatur, der Pull-Cursor folgt aber dem Server-`updated_at`
-  // (nicht der Geräteuhr), damit Uhrabweichungen keine Lücken reißen.
-  const pushed = await pushOutbox(remote)
+const TABLES: SyncTable[] = ['modules', 'topics', 'cards', 'states']
+const EPOCH = '1970-01-01T00:00:00.000Z'
+/** Überlappung beim Pull: fängt Transaktionen ab, die mit älterem `synced_at` später sichtbar werden. */
+export const PULL_OVERLAP_MS = 5000
+const cursorKey = (t: SyncTable) => `lastPull:${t}`
 
-  const since = ((await db.meta.get('lastPull'))?.value as string | undefined) ?? '1970-01-01T00:00:00.000Z'
+export async function sync(
+  remote: Remote,
+  _now: Date,
+): Promise<{ pushed: number; pulled: number; pushError?: string }> {
+  // `_now` bleibt in der Signatur; Pull-Cursor sind Server-`synced_at` je Tabelle, nie die Geräteuhr.
+  const push = await pushOutbox(remote)
+
+  const cursors = {} as Cursors
+  for (const t of TABLES) cursors[t] = ((await db.meta.get(cursorKey(t)))?.value as string | undefined) ?? EPOCH
+  const since = {} as Cursors
+  for (const t of TABLES) since[t] = new Date(Math.max(0, Date.parse(cursors[t]) - PULL_OVERLAP_MS)).toISOString()
+
+  // Pull läuft auch, wenn der Push scheiterte; ein Pull-Fehler bricht den Sync ab.
   const incoming = await remote.pullSince(since)
-
-  let cursor = since
-  for (const list of [incoming.modules, incoming.topics, incoming.cards, incoming.states]) {
-    for (const item of list) if (item.updatedAt > cursor) cursor = item.updatedAt
-  }
 
   const pulled = await db.transaction('rw', [db.modules, db.topics, db.cards, db.states, db.meta], async () => {
     let n = 0
@@ -96,9 +145,14 @@ export async function sync(remote: Remote, _now: Date): Promise<{ pushed: number
     n += await applyNewer(incoming.topics, (t) => db.topics.get(t.id), (t) => db.topics.put(t))
     n += await applyNewer(incoming.cards, (c) => db.cards.get(c.id), (c) => db.cards.put(c))
     n += await applyNewer(incoming.states, (s) => db.states.get(s.cardId), (s) => db.states.put(s))
-    if (cursor !== since) await db.meta.put({ key: 'lastPull', value: cursor })
+    for (const t of TABLES) {
+      const next = incoming.cursors[t]
+      if (next && Date.parse(next) > Date.parse(cursors[t])) await db.meta.put({ key: cursorKey(t), value: next })
+    }
     return n
   })
 
-  return { pushed, pulled }
+  const result: { pushed: number; pulled: number; pushError?: string } = { pushed: push.pushed, pulled }
+  if (push.error) result.pushError = push.error instanceof Error ? push.error.message : String(push.error)
+  return result
 }
