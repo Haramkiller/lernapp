@@ -51,8 +51,14 @@ export function createSupabaseGateway(cfg: SupabaseConfig): Gateway {
   return {
     isLoggedIn: () => loggedIn,
     async login(email, password) {
-      const { error } = await client.auth.signInWithPassword({ email, password })
-      if (error) throw new Error('Anmeldung fehlgeschlagen: E-Mail oder Passwort stimmen nicht (oder keine Verbindung).')
+      // Wie die App: Leerzeichen um die E-Mail entfernen (z. B. vom Autofill), sonst scheitert die Anmeldung.
+      const { error } = await client.auth.signInWithPassword({ email: email.trim(), password })
+      if (error) {
+        const code = (error as { code?: string }).code
+        if (code === 'invalid_credentials') throw new Error('Anmeldung fehlgeschlagen: E-Mail oder Passwort stimmen nicht.')
+        if (code === 'email_not_confirmed') throw new Error('Anmeldung fehlgeschlagen: Die E-Mail-Adresse ist noch nicht bestätigt (Link in der Bestätigungs-Mail).')
+        throw new Error(`Anmeldung fehlgeschlagen: Keine Verbindung zu Supabase oder anderer Fehler (${error.message}).`)
+      }
       loggedIn = true
     },
     async redeemTicket(nonce) {

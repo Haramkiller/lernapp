@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "tsx src/main.ts"
+    "start": "node --use-system-ca --import tsx src/main.ts"
   },
   "dependencies": {
     "@lernapp/shared": "*",

@@ -97,6 +97,8 @@ Wer die Werkstatt nutzen will, braucht zusätzlich Abschnitt 3 auf dem eigenen P
 
 **Werkstatt meldet „Claude ist nicht angemeldet…“:** In der Eingabeaufforderung `claude` starten und mit `/login` anmelden (Abschnitt 3, Schritt 2). Danach die Werkstatt neu starten.
 
+**Werkstatt-Fenster zeigt „Supabase NICHT erreichbar … UNABLE_TO_VERIFY_LEAF_SIGNATURE“:** Ein Antivirus-Programm (z. B. Norton) prüft HTTPS-Verbindungen mit einem eigenen Zertifikat. `start.cmd` startet die Werkstatt deshalb mit `--use-system-ca`, damit Node die Zertifikate aus Windows nutzt. Erscheint die Meldung trotzdem, `start.cmd` aus diesem Projekt verwenden (nicht `npx tsx` direkt) und Node.js aktualisieren.
+
 **Die App erreicht die Werkstatt nicht (CORS-Fehler):** Prüfe `APP_ORIGIN` in `werkstatt\.env` (nur `https://<github-name>.github.io`, ohne Pfad) und starte `start.cmd` neu.
 
 **Nachfragen meldet „Ticket für die Werkstatt konnte nicht angelegt werden…“:** Beim Nachfragen über die Werkstatt schickt die App kein Zugriffstoken, sondern ein Einmal-Ticket, das nur einmal und nur 60 Sekunden gilt. Dafür braucht Supabase die Tabelle `ask_tickets` aus `schema.sql`. Wurde `schema.sql` vor diesem Update ausgeführt, die Datei einfach noch einmal **vollständig** im SQL Editor ausführen (das ist gefahrlos, bestehende Daten bleiben erhalten).

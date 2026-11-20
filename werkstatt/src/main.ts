@@ -23,4 +23,18 @@ const app = createServer({
   appOrigin: process.env.APP_ORIGIN || DEFAULT_APP_ORIGIN,
   port,
 })
-app.listen(port, '127.0.0.1', () => console.log(`Werkstatt läuft: http://127.0.0.1:${port}`))
+app.listen(port, '127.0.0.1', () => {
+  console.log(`Werkstatt läuft: http://127.0.0.1:${port}`)
+  if (url && key) void checkSupabase(url, key)
+})
+
+/** Verbindungstest beim Start: zeigt im Fenster die genaue Ursache, falls Supabase nicht erreichbar ist. */
+async function checkSupabase(base: string, apikey: string): Promise<void> {
+  try {
+    const r = await fetch(`${base.replace(/\/+$/, '')}/auth/v1/health`, { headers: { apikey } })
+    console.log(r.ok ? 'Supabase erreichbar.' : `Supabase antwortet mit Status ${r.status}.`)
+  } catch (e) {
+    const cause = (e as { cause?: { code?: string; message?: string } }).cause
+    console.warn(`Supabase NICHT erreichbar: ${(e as Error).message}${cause ? ` – ${cause.code ?? ''} ${cause.message ?? ''}` : ''}`)
+  }
+}
