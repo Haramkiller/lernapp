@@ -1,6 +1,6 @@
 import express, { type NextFunction, type Request, type RequestHandler, type Response } from 'express'
 import multer from 'multer'
-import { randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { dirname, extname, join } from 'node:path'
@@ -16,6 +16,7 @@ import type { Gateway } from './supabase'
 export const DEFAULT_APP_ORIGIN = 'https://placeholder.github.io'
 const BATCH = 200
 const MAX_UPLOAD = 100 * 1024 * 1024
+const SESSION_COOKIE = 'werkstatt_sitzung'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -125,17 +126,40 @@ export function createServer(deps: ServerDeps) {
     },
   })
 
+  // Sitzungen: Jeder erfolgreiche Login bekommt ein zufälliges Geheimnis als HttpOnly-Cookie.
+  // Nur wer es mitschickt, gilt als angemeldet – sonst könnte jedes andere Programm bzw.
+  // Benutzerkonto auf dem PC die angemeldete Werkstatt mitbenutzen. Alle Geheimnisse bleiben
+  // gültig, solange die Werkstatt läuft (zweiter Browser, localhost vs. 127.0.0.1); nur im Speicher.
+  const sessions: Buffer[] = []
+  const MAX_SESSIONS = 50
+  const sessionFrom = (req: Request): Buffer | null => {
+    for (const part of (req.headers.cookie ?? '').split(';')) {
+      const [k, ...v] = part.trim().split('=')
+      if (k === SESSION_COOKIE) {
+        const val = v.join('=')
+        return /^[A-Za-z0-9_-]{43}$/.test(val) ? Buffer.from(val) : null
+      }
+    }
+    return null
+  }
+  const hasSession = (req: Request): boolean => {
+    if (!deps.gateway?.isLoggedIn()) return false
+    const got = sessionFrom(req)
+    if (!got) return false
+    let ok = false
+    for (const s of sessions) if (timingSafeEqual(s, got)) ok = true
+    return ok
+  }
+
   app.get('/api/health', (_req, res) => void res.json({ ok: true }))
-  app.get('/api/config', (_req, res) =>
-    void res.json({ configured: deps.gateway !== null, loggedIn: deps.gateway?.isLoggedIn() ?? false }),
-  )
+  app.get('/api/config', (req, res) => void res.json({ configured: deps.gateway !== null, loggedIn: hasSession(req) }))
 
   const needGateway = (_req: Request, res: Response, next: NextFunction) => {
     if (!deps.gateway) return void res.status(503).json({ error: 'Supabase ist nicht eingerichtet (werkstatt/.env fehlt).' })
     next()
   }
-  const needLogin = (_req: Request, res: Response, next: NextFunction) => {
-    if (!deps.gateway!.isLoggedIn()) return void res.status(401).json({ error: 'Nicht angemeldet.' })
+  const needLogin = (req: Request, res: Response, next: NextFunction) => {
+    if (!hasSession(req)) return void res.status(401).json({ error: 'Nicht angemeldet.' })
     next()
   }
   const guard: RequestHandler[] = [needGateway, needLogin]
@@ -161,6 +185,10 @@ export function createServer(deps: ServerDeps) {
         res.status(401).json({ error: errMsg(e) })
         return
       }
+      const secret = randomBytes(32).toString('base64url')
+      sessions.push(Buffer.from(secret))
+      if (sessions.length > MAX_SESSIONS) sessions.shift()
+      res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${secret}; HttpOnly; SameSite=Strict; Path=/`)
       res.json({ ok: true })
     }),
   )
@@ -378,7 +406,7 @@ export function createServer(deps: ServerDeps) {
 
   const askAuth = (req: Request, res: Response, next: NextFunction) => {
     const g = deps.gateway
-    if (g?.isLoggedIn()) return next()
+    if (hasSession(req)) return next()
     const m = /^Bearer (.+)$/.exec(req.headers.authorization ?? '')
     if (!g || !m) return void res.status(401).json({ error: 'Nicht angemeldet (Werkstatt-Login oder App-Sitzung nötig).' })
     g.verifyToken(m[1]!).then(

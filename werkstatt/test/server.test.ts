@@ -7,14 +7,30 @@ import type { Card, Module, Topic } from '@lernapp/shared'
 import { createServer, type ServerDeps } from '../src/server'
 import type { Gateway } from '../src/supabase'
 
+// Wie ein Browser: das Sitzungscookie aus dem letzten Login je Server wird mitgeschickt.
+const jar = new WeakMap<object, string>()
+
 // Supertest nutzt einen zufälligen Port; die Werkstatt erwartet Host 127.0.0.1:<port> (Standard 5174).
-const request = (app: Parameters<typeof st>[0]) => {
+// cookie: undefined = Cookie aus dem Login dieses Servers, null = gar keins (fremder Aufrufer).
+const request = (app: Parameters<typeof st>[0], cookie?: string | null) => {
   const t = st(app)
-  return {
-    get: (u: string) => t.get(u).set('Host', '127.0.0.1:5174'),
-    post: (u: string) => t.post(u).set('Host', '127.0.0.1:5174'),
-    options: (u: string) => t.options(u).set('Host', '127.0.0.1:5174'),
+  const c = cookie === undefined ? jar.get(app as object) : (cookie ?? undefined)
+  const prep = <T extends { set: (k: string, v: string) => T }>(r: T): T => {
+    r = r.set('Host', '127.0.0.1:5174')
+    return c ? r.set('Cookie', c) : r
   }
+  return {
+    get: (u: string) => prep(t.get(u)),
+    post: (u: string) => prep(t.post(u)),
+    options: (u: string) => prep(t.options(u)),
+  }
+}
+
+const sessionCookie = (r: { headers: Record<string, unknown> }): string | undefined => {
+  const raw = r.headers['set-cookie'] as string[] | string | undefined
+  const list = Array.isArray(raw) ? raw : raw ? [raw] : []
+  const hit = list.find((c) => c.startsWith('werkstatt_sitzung='))
+  return hit?.split(';')[0]
 }
 
 const APP = 'https://me.github.io'
@@ -92,8 +108,12 @@ function setup(over: Partial<ServerDeps> = {}, init?: Parameters<typeof fakeGate
   return { app, ...fg, runClaude, deps, removed }
 }
 
-async function login(app: ReturnType<typeof createServer>) {
-  await request(app).post('/api/login').send({ email: 'a@b.de', password: 'richtig' }).expect(200)
+async function login(app: ReturnType<typeof createServer>): Promise<string> {
+  const r = await request(app, null).post('/api/login').send({ email: 'a@b.de', password: 'richtig' }).expect(200)
+  const c = sessionCookie(r)
+  if (!c) throw new Error('kein Sitzungscookie')
+  jar.set(app, c)
+  return c
 }
 
 async function waitJob(app: ReturnType<typeof createServer>, id: string) {
@@ -278,6 +298,76 @@ describe('Werkstatt-Server', () => {
     expect(runClaude).not.toHaveBeenCalled()
   })
 })
+
+describe('Sitzungscookie der Werkstatt', () => {
+  it('Login setzt ein HttpOnly-, SameSite=Strict-Cookie mit zufälligem Wert', async () => {
+    const { app } = setup()
+    const r = await request(app, null).post('/api/login').send({ email: 'a@b.de', password: 'richtig' }).expect(200)
+    const raw = ([] as string[]).concat(r.headers['set-cookie'] as unknown as string[]).find((c) => c.startsWith('werkstatt_sitzung='))!
+    expect(raw).toMatch(/^werkstatt_sitzung=[A-Za-z0-9_-]{43};/)
+    expect(raw).toMatch(/HttpOnly/i)
+    expect(raw).toMatch(/SameSite=Strict/i)
+    expect(raw).toMatch(/Path=\//i)
+  })
+
+  it('nach dem Login gilt nur, wer das Cookie mitschickt', async () => {
+    const runClaude = vi.fn(async () => JSON.stringify({ cards: [choiceDraft('Zellen')] }))
+    const { app, calls } = setup({ runClaude })
+    const good = await login(app)
+    const forged = `werkstatt_sitzung=${'A'.repeat(43)}`
+    for (const c of [null, forged, 'werkstatt_sitzung=', 'anderes=1']) {
+      await request(app, c).get('/api/modules').expect(401)
+      await request(app, c).post('/api/modules').send({ name: 'X' }).expect(401)
+      await request(app, c).get('/api/jobs/irgendwas').expect(401)
+      await request(app, c).post('/api/commit').send({ moduleId: 'm1', cards: [] }).expect(401)
+      await request(app, c)
+        .post('/api/generate')
+        .field('moduleId', 'm1')
+        .field('kind', 'script')
+        .attach('file', Buffer.from('%PDF-1.4'), 'skript.pdf')
+        .expect(401)
+      await request(app, c).post('/api/ask').send(askBodyForCookies).expect(401)
+      expect((await request(app, c).get('/api/config')).body).toEqual({ configured: true, loggedIn: false })
+    }
+    expect(runClaude).not.toHaveBeenCalled()
+    expect(calls.upsertModule).toHaveLength(0)
+    await request(app, `anderes=1; ${good}`).get('/api/modules').expect(200)
+    expect((await request(app, good).get('/api/config')).body).toEqual({ configured: true, loggedIn: true })
+  })
+
+  it('eine zweite Anmeldung (zweiter Browser) meldet die erste nicht ab', async () => {
+    const runClaude = vi.fn(async () => 'x')
+    const { app } = setup({ runClaude })
+    const first = await login(app)
+    const second = await login(app)
+    expect(second).not.toBe(first)
+    await request(app, first).get('/api/modules').expect(200)
+    await request(app, second).get('/api/modules').expect(200)
+    await request(app, first).post('/api/ask').send(askBodyForCookies).expect(200)
+    await request(app, second).post('/api/ask').send(askBodyForCookies).expect(200)
+  })
+
+  it('fehlgeschlagener Login setzt kein Cookie und lässt bestehende Sitzungen gültig', async () => {
+    const { app } = setup()
+    const good = await login(app)
+    const r = await request(app, null).post('/api/login').send({ email: 'a@b.de', password: 'falsch' }).expect(401)
+    expect(sessionCookie(r)).toBeUndefined()
+    await request(app, good).get('/api/modules').expect(200)
+  })
+
+  it('Bearer-Token der App funktioniert weiterhin ohne Cookie', async () => {
+    const runClaude = vi.fn(async () => 'x')
+    const { app } = setup({ runClaude })
+    await login(app)
+    await request(app, null).post('/api/ask').set('Authorization', 'Bearer gueltig').send(askBodyForCookies).expect(200)
+  })
+})
+
+const askBodyForCookies = {
+  card: { type: 'free', payload: { question: 'q', modelAnswer: 'a', keyPoints: ['a'] }, explanation: '', source: null },
+  userAnswer: 'b',
+  history: [],
+}
 
 describe('Host-Schutz', () => {
   it('lehnt fremden Host ab, erlaubt lokalen', async () => {
