@@ -12,7 +12,7 @@ import { HomeScreen, type SyncStatus } from './ui/HomeScreen'
 import { LoginScreen, type AuthMode } from './ui/LoginScreen'
 import { SettingsScreen } from './ui/SettingsScreen'
 import { SetupScreen } from './ui/SetupScreen'
-import { StudyScreen } from './ui/StudyScreen'
+import { BattleScreen } from './ui/BattleScreen'
 
 type View = { name: 'home' } | { name: 'study'; moduleId?: string } | { name: 'settings' }
 
@@ -203,7 +203,7 @@ export function App({ env = defaultEnv, makeClient = createAppClient, confirm = 
         />
       )}
       {view.name === 'study' && (
-        <StudyScreen
+        <BattleScreen
           moduleId={view.moduleId}
           onFinished={() => void runSync()}
           renderAsk={(card, answer, close) => <AskDialog key={card.id} card={card} answer={answer} getTicket={getTicket} onClose={close} />}

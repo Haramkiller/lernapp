@@ -11,7 +11,7 @@ import { newDoneKey } from '../../src/session/queue'
 import { newSrsState, review } from '../../src/srs/scheduler'
 import { Cloze } from '../../src/ui/questions/Cloze'
 import { HomeScreen } from '../../src/ui/HomeScreen'
-import { StudyScreen } from '../../src/ui/StudyScreen'
+import { BattleScreen } from '../../src/ui/BattleScreen'
 import { seededRng } from '../../src/ui/random'
 import { choiceCard, clozeCard, orderCard } from './fixtures'
 
@@ -29,7 +29,7 @@ describe('Einheit vorzeitig beenden', () => {
   it('Beenden zeigt Zusammenfassung bisher und ruft onFinished', async () => {
     await db.cards.bulkPut([choiceCard('a'), choiceCard('b'), choiceCard('c')])
     const onFinished = vi.fn()
-    render(<StudyScreen now={() => NOW} rng={seededRng(1)} onFinished={onFinished} onExit={vi.fn()} />)
+    render(<BattleScreen now={() => NOW} rng={seededRng(1)} onFinished={onFinished} onExit={vi.fn()} />)
     await userEvent.click(await screen.findByRole('button', { name: /Richtig B/ }))
     await userEvent.click(await screen.findByRole('button', { name: 'Weiter' }))
     expect(onFinished).not.toHaveBeenCalled()
@@ -51,7 +51,7 @@ describe('fehlerhafte Karten', () => {
   it('Fehlergrenze zeigt Meldung, Überspringen ohne Review zeigt die nächste Karte', async () => {
     quiet()
     await db.cards.bulkPut([broken(), choiceCard('ok')])
-    render(<StudyScreen now={() => NOW} rng={seededRng(1)} validate={() => true} onExit={vi.fn()} />)
+    render(<BattleScreen now={() => NOW} rng={seededRng(1)} validate={() => true} onExit={vi.fn()} />)
     expect(await screen.findByText('Diese Karte kann nicht angezeigt werden.')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Karte überspringen' }))
     expect(await screen.findByRole('button', { name: /Richtig B/ })).toBeInTheDocument()
@@ -60,7 +60,7 @@ describe('fehlerhafte Karten', () => {
 
   it('Schema-Prüfung überspringt ungültige Karten beim Aufbau der Einheit', async () => {
     await db.cards.bulkPut([broken(), choiceCard('ok')])
-    render(<StudyScreen now={() => NOW} rng={seededRng(1)} onExit={vi.fn()} />)
+    render(<BattleScreen now={() => NOW} rng={seededRng(1)} onExit={vi.fn()} />)
     expect(await screen.findByRole('button', { name: /Richtig B/ })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /Richtig B/ }))
     await userEvent.click(await screen.findByRole('button', { name: 'Weiter' }))
@@ -79,7 +79,7 @@ describe('fehlerhafte Karten', () => {
 describe('Fehler werden angezeigt', () => {
   it('fehlgeschlagenes Speichern der Antwort zeigt Meldung und erlaubt neuen Versuch', async () => {
     await db.cards.bulkPut([choiceCard('a')])
-    render(<StudyScreen now={() => NOW} rng={seededRng(1)} onExit={vi.fn()} />)
+    render(<BattleScreen now={() => NOW} rng={seededRng(1)} onExit={vi.fn()} />)
     const option = await screen.findByRole('button', { name: /Richtig B/ })
     const spy = vi.spyOn(db.states, 'put').mockRejectedValue(new Error('Speicher voll'))
     await userEvent.click(option)
@@ -92,7 +92,7 @@ describe('Fehler werden angezeigt', () => {
 
   it('Study: Ladefehler mit „Erneut versuchen“', async () => {
     const spy = vi.spyOn(db.cards, 'toArray').mockRejectedValue(new Error('DB gesperrt'))
-    render(<StudyScreen now={() => NOW} rng={seededRng(1)} onExit={vi.fn()} />)
+    render(<BattleScreen now={() => NOW} rng={seededRng(1)} onExit={vi.fn()} />)
     expect(await screen.findByRole('alert')).toHaveTextContent('DB gesperrt')
     spy.mockRestore()
     await userEvent.click(screen.getByRole('button', { name: 'Erneut versuchen' }))
@@ -112,7 +112,7 @@ describe('Fehler werden angezeigt', () => {
 describe('Zähler neuer Karten', () => {
   it('falsch beantwortete neue Karte zählt genau einmal, auch bei späterer Wiederholung', async () => {
     await db.cards.bulkPut([choiceCard('a')])
-    render(<StudyScreen now={() => NOW} rng={seededRng(1)} onExit={vi.fn()} />)
+    render(<BattleScreen now={() => NOW} rng={seededRng(1)} onExit={vi.fn()} />)
     await userEvent.click(await screen.findByRole('button', { name: /Falsch A/ }))
     await screen.findByRole('button', { name: 'Weiter' })
     const key = newDoneKey(NOW)
@@ -126,7 +126,7 @@ describe('Zähler neuer Karten', () => {
   it('Antwort nach 04:00 zählt für den neuen Lerntag', async () => {
     await db.cards.bulkPut([choiceCard('a')])
     let clock = new Date(2026, 2, 10, 3, 59)
-    render(<StudyScreen now={() => clock} rng={seededRng(1)} onExit={vi.fn()} />)
+    render(<BattleScreen now={() => clock} rng={seededRng(1)} onExit={vi.fn()} />)
     const option = await screen.findByRole('button', { name: /Richtig B/ })
     const before = newDoneKey(clock)
     clock = new Date(2026, 2, 10, 4, 1)
