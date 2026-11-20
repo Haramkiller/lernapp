@@ -9,6 +9,8 @@ import { App } from '../../src/App'
 import { db } from '../../src/data/db'
 import { saveSignedInMarker } from '../../src/data/account'
 import { loadOverride, saveOverride } from '../../src/data/settings'
+import { loadLastBattleAt, saveAreaChoice } from '../../src/data/game'
+import { choiceCard } from './fixtures'
 
 const URL_A = 'https://a.supabase.co'
 const env = { url: URL_A, key: 'anon-a' }
@@ -44,7 +46,13 @@ function fakeClient(initial: GetSession) {
 }
 
 const retryable = () => new AuthRetryableFetchError('Failed to fetch', 0)
-const home = () => screen.findByRole('button', { name: /Einstellungen/ })
+/** Erster Bildschirm nach der Anmeldung: das Titelbild. */
+const home = () => screen.findByRole('button', { name: "Los geht's" })
+/** Titelbild → Waldplatz → Menü. */
+async function openMenu() {
+  await userEvent.click(await home())
+  await userEvent.click(await screen.findByRole('button', { name: 'Menü' }))
+}
 
 beforeEach(async () => {
   await Promise.all([db.cards.clear(), db.states.clear(), db.outbox.clear(), db.meta.clear(), db.modules.clear(), db.topics.clear(), db.dead.clear()])
@@ -68,6 +76,7 @@ describe('App: Offline-Start', () => {
     const { client } = fakeClient({ data: { session: null }, error: retryable() })
     render(<App env={env} makeClient={() => client} />)
     expect(await home()).toBeInTheDocument()
+    await openMenu()
     expect(await screen.findByText(/Offline/)).toBeInTheDocument()
   })
 
@@ -125,8 +134,9 @@ describe('App: Abmelden', () => {
     // Netzaufruf scheitert: auth-js (scope global) würde die Sitzung behalten und kein SIGNED_OUT senden
     auth.signOut.mockImplementation(async () => ({ error: retryable() }) as never)
     render(<App env={env} makeClient={() => client} />)
-    await userEvent.click(await screen.findByRole('button', { name: /Einstellungen/ }))
-    await userEvent.click(screen.getByRole('button', { name: 'Abmelden' }))
+    await openMenu()
+    await userEvent.click(await screen.findByRole('button', { name: 'Einstellungen' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Abmelden' }))
     expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
     expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' })
     expect(await db.meta.get('signedIn')).toBeUndefined()
@@ -240,5 +250,27 @@ describe('App: eigene Datenbank vor der Anmeldung', () => {
     await vi.waitFor(() => expect(made.at(-1)).toBe(URL_A), { timeout: 5_000 })
     expect(await screen.findByRole('heading', { name: 'Anmelden' }, { timeout: 5_000 })).toBeInTheDocument()
     expect(await loadOverride()).toBeNull()
+  })
+})
+
+describe('App: Titelbild, Lagerfeuer, Kampf', () => {
+  it('nach einem Kampf mit einer Antwort zurück ans Feuer; der Zeitpunkt für „Ausgeruht“ ist gespeichert', async () => {
+    const iso = new Date().toISOString()
+    await db.modules.put({ id: 'm1', name: 'Botanik', examDate: null, styleProfile: null, updatedAt: iso })
+    await saveAreaChoice('m1', 'moosgolem', new Date())
+    await db.cards.bulkPut([choiceCard('a'), choiceCard('b')])
+    const { client } = fakeClient({ data: { session: session('u1') }, error: null })
+    render(<App env={env} makeClient={() => client} />)
+    await userEvent.click(await home())
+    await userEvent.click(await screen.findByRole('button', { name: 'Lagerfeuer – Karte öffnen' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Wald: Botanik' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Kämpfen' }))
+    await userEvent.click(await screen.findByRole('button', { name: /Richtig B/ }))
+    await screen.findByRole('button', { name: 'Weiter' })
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Beenden' })).toBeEnabled())
+    await userEvent.click(screen.getByRole('button', { name: 'Beenden' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Zur Übersicht' }))
+    expect(await screen.findByRole('button', { name: 'Lagerfeuer – Karte öffnen' })).toBeInTheDocument()
+    await vi.waitFor(async () => expect(await loadLastBattleAt()).not.toBeNull())
   })
 })

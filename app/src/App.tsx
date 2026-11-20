@@ -6,15 +6,17 @@ import { resolveSupabaseConfig, type SupabaseConfig } from './data/config'
 import { createSupabaseRemote } from './data/remote'
 import { loadOverride, saveOverride } from './data/settings'
 import { sync } from './data/sync'
+import { saveLastBattleAt } from './data/game'
 import { AskDialog } from './ui/AskDialog'
 import { InstallHint } from './ui/InstallHint'
-import { HomeScreen, type SyncStatus } from './ui/HomeScreen'
+import { CampScreen, type SyncStatus } from './ui/CampScreen'
+import { TitleScreen } from './ui/TitleScreen'
 import { LoginScreen, type AuthMode } from './ui/LoginScreen'
 import { SettingsScreen } from './ui/SettingsScreen'
 import { SetupScreen } from './ui/SetupScreen'
 import { BattleScreen } from './ui/BattleScreen'
 
-type View = { name: 'home' } | { name: 'study'; moduleId?: string } | { name: 'settings' }
+type View = { name: 'title' } | { name: 'camp' } | { name: 'study'; moduleId?: string; rested: boolean } | { name: 'settings' }
 
 const defaultEnv = { url: import.meta.env.VITE_SUPABASE_URL as string | undefined, key: import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined }
 
@@ -36,7 +38,7 @@ export function App({ env = defaultEnv, makeClient = createAppClient, confirm = 
   const [override, setOverride] = useState<SupabaseConfig | null>(null)
   const [setupOpen, setSetupOpen] = useState(false)
   const [signedIn, setSignedIn] = useState<boolean | undefined>(undefined)
-  const [view, setView] = useState<View>({ name: 'home' })
+  const [view, setView] = useState<View>({ name: 'title' })
   const [status, setStatus] = useState<SyncStatus>({ kind: 'idle' })
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -193,11 +195,12 @@ export function App({ env = defaultEnv, makeClient = createAppClient, confirm = 
   return (
     <main className="app">
       <InstallHint />
-      {view.name === 'home' && (
-        <HomeScreen
+      {view.name === 'title' && <TitleScreen refreshKey={refreshKey} onStart={() => setView({ name: 'camp' })} />}
+      {view.name === 'camp' && (
+        <CampScreen
           sync={status}
           refreshKey={refreshKey}
-          onStudy={(moduleId) => setView({ name: 'study', moduleId })}
+          onBattle={(moduleId, rested) => setView({ name: 'study', moduleId, rested })}
           onSettings={() => setView({ name: 'settings' })}
           onSyncNow={() => void runSync()}
         />
@@ -205,17 +208,23 @@ export function App({ env = defaultEnv, makeClient = createAppClient, confirm = 
       {view.name === 'study' && (
         <BattleScreen
           moduleId={view.moduleId}
-          onFinished={() => void runSync()}
+          rested={view.rested}
+          onFinished={(answered) => {
+            // Erst danach synchronisieren, damit der Zeitpunkt für „Ausgeruht“ gleich mitgeht.
+            void (answered > 0 ? saveLastBattleAt(new Date()) : Promise.resolve())
+              .catch(() => undefined)
+              .then(() => runSync())
+          }}
           renderAsk={(card, answer, close) => <AskDialog key={card.id} card={card} answer={answer} getTicket={getTicket} onClose={close} />}
           onExit={() => {
             setRefreshKey((k) => k + 1)
-            setView({ name: 'home' })
+            setView({ name: 'camp' })
           }}
         />
       )}
       {view.name === 'settings' && (
         <SettingsScreen
-          onBack={() => setView({ name: 'home' })}
+          onBack={() => setView({ name: 'camp' })}
           onOverrideChanged={() => void loadConfig()}
           onLogout={async () => {
             // scope local: auth-js entfernt die gespeicherte Sitzung auch ohne Netz (global bräche vorher ab).
@@ -223,7 +232,7 @@ export function App({ env = defaultEnv, makeClient = createAppClient, confirm = 
             await clearSignedInMarker()
             signedInRef.current = false
             setSignedIn(false)
-            setView({ name: 'home' })
+            setView({ name: 'title' })
           }}
         />
       )}

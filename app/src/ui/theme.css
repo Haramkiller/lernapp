@@ -659,16 +659,17 @@ button.module {
 }
 .scene-hint {
   position: absolute;
+  /* oben links im Himmel, neben dem Menü – unten säße es auf dem Feuer */
   left: 10px;
-  right: 10px;
-  bottom: 10px;
+  right: 96px;
+  top: 10px;
   margin: 0;
   padding: 6px 10px;
   border: 2px solid #000;
   border-radius: 8px;
   background: rgba(20, 18, 31, 0.85);
   font-size: 0.85rem;
-  text-align: center;
+  text-align: left;
 }
 .camp-menu .sync {
   margin-top: 0;
@@ -774,7 +775,10 @@ button.module {
 }
 .region-module h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: clamp(0.8rem, 3.6vw, 1rem);
+  /* lange Modulnamen (z. B. „Trainingslehre“) dürfen umbrechen statt abgeschnitten zu werden */
+  overflow-wrap: anywhere;
+  hyphens: auto;
 }
 .region-module p {
   margin: 2px 0 6px;
@@ -786,6 +790,7 @@ button.module {
 }
 .region-top > div {
   flex: 1;
+  min-width: 0;
 }
 .region-icon {
   width: 48px;
@@ -835,4 +840,52 @@ button.module {
   .fire-glow {
     animation: none;
   }
+}
+
+/* Titelbild (Teil 2) */
+.title-screen {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  aspect-ratio: 3 / 4;
+  border: 3px solid #000;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+  cursor: pointer;
+}
+.title-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.title-top {
+  position: absolute;
+  top: 9%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  text-shadow: 2px 2px 0 #000;
+}
+.title-top h1 {
+  margin: 0;
+  font-size: clamp(1.1rem, 6vw, 1.7rem);
+  color: #ffe3a3;
+  text-shadow: 3px 3px 0 #000;
+}
+.title-top p {
+  margin: 10px 0 0;
+  font-size: 0.9rem;
+}
+button.title-start {
+  position: absolute;
+  left: 50%;
+  bottom: 5%;
+  transform: translateX(-50%);
+  width: auto;
+  margin: 0;
+  white-space: nowrap;
 }

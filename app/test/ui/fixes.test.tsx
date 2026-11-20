@@ -10,7 +10,6 @@ import { recordReview } from '../../src/data/sync'
 import { newDoneKey } from '../../src/session/queue'
 import { newSrsState, review } from '../../src/srs/scheduler'
 import { Cloze } from '../../src/ui/questions/Cloze'
-import { HomeScreen } from '../../src/ui/HomeScreen'
 import { BattleScreen } from '../../src/ui/BattleScreen'
 import { seededRng } from '../../src/ui/random'
 import { choiceCard, clozeCard, orderCard } from './fixtures'
@@ -97,15 +96,6 @@ describe('Fehler werden angezeigt', () => {
     spy.mockRestore()
     await userEvent.click(screen.getByRole('button', { name: 'Erneut versuchen' }))
     expect(await screen.findByText(/Nichts zu lernen/)).toBeInTheDocument()
-  })
-
-  it('Home: Ladefehler mit „Erneut versuchen“', async () => {
-    const spy = vi.spyOn(db.cards, 'toArray').mockRejectedValue(new Error('DB gesperrt'))
-    render(<HomeScreen now={() => NOW} sync={{ kind: 'idle' }} onStudy={vi.fn()} onSettings={vi.fn()} />)
-    expect(await screen.findByRole('alert')).toHaveTextContent('DB gesperrt')
-    spy.mockRestore()
-    await userEvent.click(screen.getByRole('button', { name: 'Erneut versuchen' }))
-    expect(await screen.findByText('Heute fällig: 0 · Neu: 0')).toBeInTheDocument()
   })
 })
 
