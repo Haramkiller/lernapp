@@ -51,6 +51,16 @@ describe('HomeScreen', () => {
     expect(await screen.findByRole('button', { name: 'Kämpfen' })).toBeDisabled()
   })
 
+  it('fällige Karten ohne bekanntes Modul: gemischter Kampf statt gesperrtem Knopf', async () => {
+    await db.cards.bulkPut([choiceCard('a', { moduleId: 'm9' })])
+    const onStudy = vi.fn()
+    render(<HomeScreen now={() => NOW} sync={{ kind: 'idle' }} onStudy={onStudy} onSettings={vi.fn()} />)
+    const button = await screen.findByRole('button', { name: 'Kämpfen' })
+    expect(button).toBeEnabled()
+    await userEvent.click(button)
+    expect(onStudy).toHaveBeenCalledWith(undefined)
+  })
+
   it('zeigt den Boss je Modul', async () => {
     await db.modules.put({ id: 'm1', name: 'Botanik', examDate: null, styleProfile: null, updatedAt: NOW.toISOString() })
     render(<HomeScreen now={() => NOW} sync={{ kind: 'idle' }} onStudy={vi.fn()} onSettings={vi.fn()} />)

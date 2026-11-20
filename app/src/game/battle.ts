@@ -11,6 +11,8 @@ export type Battle = {
   maxHp: number
   combo: number
   bestCombo: number
+  /** Wie oft der Boss in diesem Kampf zu Boden ging; mindestens einmal = besiegt. */
+  knockouts: number
   finished: boolean
   defeated: boolean
   last: Hit | null
@@ -28,7 +30,7 @@ const tierOf = (combo: number): Tier => (combo >= 6 ? 3 : combo >= 3 ? 2 : 1)
 
 export function startBattle(total: number): Battle {
   const hp = total * HP_PER_QUESTION
-  return { total, answered: 0, phase: 1, hp, maxHp: hp, combo: 0, bestCombo: 0, finished: false, defeated: false, last: null }
+  return { total, answered: 0, phase: 1, hp, maxHp: hp, combo: 0, bestCombo: 0, knockouts: 0, finished: false, defeated: false, last: null }
 }
 
 /** Wertet eine gespeicherte Antwort aus. Kein Tempobonus: Zeit spielt keine Rolle. */
@@ -58,15 +60,13 @@ export function applyAnswer(b: Battle, a: { outcome: Outcome; elapsedDays: numbe
   const knockedOut = hp === 0
   const remaining = b.total - answered
   const finished = remaining <= 0
-  let defeated = false
-  if (knockedOut) {
-    if (remaining > 0) {
-      phase += 1
-      hp = maxHp = remaining * HP_PER_QUESTION
-    } else {
-      defeated = true
-    }
+  const knockouts = b.knockouts + (knockedOut ? 1 : 0)
+  if (knockedOut && remaining > 0) {
+    phase += 1
+    hp = maxHp = remaining * HP_PER_QUESTION
   }
+  // Besiegt, sobald er einmal am Boden war: eine verpatzte letzte Frage macht den Sieg nicht zunichte.
+  const defeated = finished && knockouts > 0
   return {
     ...b,
     answered,
@@ -75,6 +75,7 @@ export function applyAnswer(b: Battle, a: { outcome: Outcome; elapsedDays: numbe
     maxHp,
     combo,
     bestCombo: Math.max(b.bestCombo, combo),
+    knockouts,
     finished,
     defeated,
     last: { outcome: a.outcome, damage, tier, crit, lucky, knockedOut },
@@ -82,7 +83,7 @@ export function applyAnswer(b: Battle, a: { outcome: Outcome; elapsedDays: numbe
 }
 
 export function endBattle(b: Battle): Battle {
-  return b.finished ? b : { ...b, finished: true }
+  return b.finished ? b : { ...b, finished: true, defeated: b.knockouts > 0 }
 }
 
 export function hpPercent(b: Battle): number {

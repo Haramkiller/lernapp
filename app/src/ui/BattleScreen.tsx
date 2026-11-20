@@ -69,6 +69,7 @@ export function BattleScreen({
   const [skippedInvalid, setSkippedInvalid] = useState(0)
   const [ended, setEnded] = useState(false)
   const [asking, setAsking] = useState(false)
+  const [saving, setSaving] = useState(false)
   const settings = useRef<Settings | null>(null)
   const busy = useRef(false)
   const finished = useRef(false)
@@ -150,6 +151,7 @@ export function BattleScreen({
       <section className="battle-result">
         <h2 className="pixel">{final.defeated ? 'Besiegt!' : 'Geflohen'}</h2>
         <p className="result-boss">{name}</p>
+        {final.defeated && final.knockouts > 1 && <p>Du hast ihn {final.knockouts}-mal zu Boden geschickt.</p>}
         {!final.defeated && <p>Er flieht mit {hpPercent(final)} % Leben.</p>}
         <p className="summary">
           {counts.right} richtig, {counts.partial} teilweise, {counts.wrong} falsch
@@ -169,6 +171,7 @@ export function BattleScreen({
   const answer = async (outcome: Outcome, detail: Answer) => {
     if (busy.current) return
     busy.current = true
+    setSaving(true)
     setSaveError(null)
     try {
       const t = now()
@@ -188,6 +191,7 @@ export function BattleScreen({
       setSaveError(`Die Antwort konnte nicht gespeichert werden: ${message(e)}. Bitte versuche es erneut.`)
     } finally {
       busy.current = false
+      setSaving(false)
     }
   }
 
@@ -206,7 +210,8 @@ export function BattleScreen({
           <p className="progress pixel">
             {index + 1} / {cards.length}
           </p>
-          <button type="button" onClick={() => setEnded(true)}>
+          {/* Während des Speichern gesperrt: sonst änderte sich das Ergebnis nach der Anzeige. */}
+          <button type="button" onClick={() => setEnded(true)} disabled={saving}>
             Beenden
           </button>
         </div>

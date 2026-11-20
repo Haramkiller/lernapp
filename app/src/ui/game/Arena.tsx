@@ -30,9 +30,17 @@ export function Arena({ boss, name, battle, turn, active }: Props) {
   const [attacking, setAttacking] = useState(false)
   const [doneFx, setDoneFx] = useState<string[]>([])
 
+  // Alle Bilder vorladen, damit der erste Treffer nicht leer bleibt oder ruckelt.
+  useEffect(() => {
+    const all = [bossBackdrop(boss), ...(['idle', 'attack', 'hit'] as const).flatMap((a) => bossFrames(boss, a))]
+    for (const f of Object.keys(FX) as FxName[]) all.push(...fxFrames(f))
+    for (const src of all) new Image().src = src
+  }, [boss])
+
   useEffect(() => {
     if (turn === 0 || !hit) return
     setDoneFx([])
+    setAttacking(false)
     if (hit.outcome === 'wrong') {
       setAnim('attack')
       setAttacking(true)

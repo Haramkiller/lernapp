@@ -59,8 +59,28 @@ describe('battle', () => {
     expect(b.last!.knockedOut).toBe(true)
     expect(b).toMatchObject({ phase: 2, hp: 10, maxHp: 10, finished: false })
     b = applyAnswer(b, { outcome: 'wrong', elapsedDays: 1 }, never)
-    expect(b).toMatchObject({ finished: true, defeated: false })
-    expect(hpPercent(b)).toBe(100)
+    // Einmal zu Boden geschickt zählt als besiegt, auch wenn die letzte Antwort danebenging.
+    expect(b).toMatchObject({ finished: true, defeated: true, knockouts: 1 })
+  })
+
+  it('fast perfekter Kampf (nur die letzte falsch) endet nicht mit „Geflohen“', () => {
+    let b = startBattle(25)
+    for (let i = 0; i < 24; i++) b = applyAnswer(b, R, never)
+    b = applyAnswer(b, { outcome: 'wrong', elapsedDays: 1 }, never)
+    expect(b.defeated).toBe(true)
+    expect(b.knockouts).toBeGreaterThan(1)
+  })
+
+  it('nie zu Boden geschickt: geflohen', () => {
+    let b = startBattle(3)
+    for (let i = 0; i < 3; i++) b = applyAnswer(b, { outcome: 'partial', elapsedDays: 1 }, never)
+    expect(b).toMatchObject({ finished: true, defeated: false, knockouts: 0 })
+  })
+
+  it('Beenden nach einem k.o.: besiegt', () => {
+    let b = applyAnswer(startBattle(3), { outcome: 'right', elapsedDays: 30 }, never)
+    b = applyAnswer(b, R, never)
+    expect(endBattle(b).defeated).toBe(true)
   })
 
   it('Beenden: geflohen, danach keine Änderung mehr', () => {

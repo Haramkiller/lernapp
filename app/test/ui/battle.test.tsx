@@ -187,6 +187,15 @@ describe('BattleScreen: Kampf', () => {
     spy.mockRestore()
   })
 
+  it('Beenden ist gesperrt, solange eine Antwort gespeichert wird', async () => {
+    await cards(2)
+    const spy = vi.spyOn(db.states, 'put').mockImplementationOnce(() => new Promise<string>(() => {}) as never)
+    render(<BattleScreen now={() => NOW} rng={NO_LUCK} onExit={vi.fn()} />)
+    await right()
+    expect(screen.getByRole('button', { name: 'Beenden' })).toBeDisabled()
+    spy.mockRestore()
+  })
+
   it('Weiter sofort nach Treffer: nächste Frage bedienbar, kein alter Effekt', async () => {
     await cards(2)
     const { container } = render(<BattleScreen now={() => NOW} rng={NO_LUCK} onExit={vi.fn()} />)

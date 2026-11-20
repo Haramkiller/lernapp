@@ -92,8 +92,9 @@ export function HomeScreen({ now = () => new Date(), sync, refreshKey = 0, onStu
           <button
             type="button"
             className="primary big"
-            onClick={() => data.next && onStudy(data.next.id)}
-            disabled={data.next === undefined}
+            // Fällige Karten ohne bekanntes Modul (gelöscht/noch nicht synchronisiert): gemischter Kampf.
+            onClick={() => onStudy(data.next?.id)}
+            disabled={data.due + data.fresh === 0}
           >
             {data.next ? `Kämpfen: ${data.next.name}` : 'Kämpfen'}
           </button>
