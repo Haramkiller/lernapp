@@ -108,7 +108,7 @@ $('generate').addEventListener('click', async () => {
   fd.append('moduleId', moduleId)
   fd.append('kind', kind)
   fd.append('file', state.file)
-  show('preview', false); show('job-error', false)
+  show('preview', false); show('job-error', false); show('job-notice', false)
   $('generate').disabled = true
   show('progress', true)
   $('bar').value = 0; $('bar').max = 1
@@ -134,6 +134,8 @@ async function poll(jobId, moduleId) {
     $('bar').max = Math.max(job.progress.total, 1)
     $('bar').value = job.progress.done
     $('progress-text').textContent = `Abschnitt ${job.progress.done} von ${job.progress.total} fertig`
+    $('job-notice').textContent = job.notice || ''
+    show('job-notice', Boolean(job.notice))
     if (job.status === 'running') { await new Promise((r) => setTimeout(r, 1500)); continue }
     if (job.error) showJobError(job.error)
     if (job.status === 'done') startPreview(job, moduleId)

@@ -107,7 +107,7 @@ function setup(over: Partial<ServerDeps> = {}, init?: Parameters<typeof fakeGate
         { path: b, firstPage: 16, lastPage: 20 },
       ]
     }),
-    assertHasText: vi.fn(async () => {}),
+    hasText: vi.fn(async () => true),
     appOrigin: APP,
     uploadDir: dir,
     removeFile: async (p) => void removed.push(p),
@@ -205,17 +205,26 @@ describe('Werkstatt-Server', () => {
     expect(j2.error).toContain('Limit')
   })
 
-  it('lehnt Nicht-PDF und gescannte PDFs ab und löscht den Upload', async () => {
-    const { app, removed } = setup()
+  it('lehnt Nicht-PDF ab; unlesbare PDFs → 422 und Upload gelöscht', async () => {
+    const { app } = setup()
     await login(app)
     await request(app).post('/api/generate').field('moduleId', 'm1').field('kind', 'script').attach('file', Buffer.from('x'), 'a.txt').expect(400)
 
-    const scanned = setup({ assertHasText: vi.fn(async () => { throw new Error('gescannt') }) })
+    const broken = setup({ hasText: vi.fn(async () => { throw new Error('Invalid PDF structure') }) })
+    await login(broken.app)
+    const r = await generate(broken.app).expect(422)
+    expect(r.body.error).toContain('PDF konnte nicht gelesen werden')
+    expect(broken.removed).toHaveLength(1)
+  })
+
+  it('gescannte PDFs werden verarbeitet und bekommen einen Hinweis', async () => {
+    const scanned = setup({ hasText: vi.fn(async () => false) })
     await login(scanned.app)
-    const r = await generate(scanned.app).expect(422)
-    expect(r.body.error).toContain('gescannt')
-    expect(scanned.removed).toHaveLength(1)
-    void removed
+    const { body } = await generate(scanned.app).expect(200)
+    const job = await waitJob(scanned.app, body.jobId)
+    expect(job.status).toBe('done')
+    expect(job.notice).toMatch(/gescannt/)
+    expect(scanned.runClaude).toHaveBeenCalled()
   })
 
   it('commit schreibt user_id-lose Karten, legt Themen an und markiert Klausurrelevanz', async () => {

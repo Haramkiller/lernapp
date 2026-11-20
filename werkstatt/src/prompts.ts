@@ -46,6 +46,7 @@ function common(chunk: PromptChunk, ctx: { moduleName: string; existingTopics: s
 
 Lies den PDF-Abschnitt mit dem Read-Werkzeug unter diesem absoluten Pfad: ${chunk.path}
 Der Abschnitt enthält die Seiten ${chunk.firstPage}–${chunk.lastPage} der Originaldatei "${ctx.fileName}".
+Die Seiten können gescannt sein (Bilder ohne Textebene): Lies sie dann vom Bild ab. Was du nicht sicher entziffern kannst, lässt du weg, statt zu raten.
 
 Seitenzahlen: Gib in "source.page" immer die Seitenzahl im ORIGINAL-PDF an. Offset: Seite im Original = Seite im Abschnitt + ${offset} (Abschnittsseite 1 ist Originalseite ${chunk.firstPage}). "source.file" ist "${ctx.fileName}".
 

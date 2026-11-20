@@ -1,7 +1,7 @@
 // Probelauf: PDF teilen -> Claude -> Karten auswerten. Aufruf: npx tsx werkstatt/scripts/try.ts <pdf>
 import { basename, dirname } from 'node:path'
 import { rmSync } from 'node:fs'
-import { assertHasText, splitPdf } from '../src/pdf'
+import { hasText, SCANNED_NOTICE, splitPdf } from '../src/pdf'
 import { scriptPrompt } from '../src/prompts'
 import { runClaude } from '../src/claude'
 import { parseGeneration } from '../src/parse'
@@ -12,7 +12,7 @@ if (!pdf) {
   process.exit(1)
 }
 
-await assertHasText(pdf)
+if (!(await hasText(pdf))) console.log(SCANNED_NOTICE)
 const chunks = await splitPdf(pdf)
 let total = 0
 try {

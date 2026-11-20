@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { splitPdf, hasText } from '../src/pdf'
+import { splitPdf, hasText, pagesPerChunkFor } from '../src/pdf'
 
 const dir = mkdtempSync(join(tmpdir(), 'werkstatt-pdf-'))
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
@@ -29,6 +29,26 @@ describe('splitPdf', () => {
     expect(chunks.map((c) => c.lastPage)).toEqual([15, 30, 40])
     const last = await PDFDocument.load(await readFile(chunks[2]!.path))
     expect(last.getPageCount()).toBe(10)
+    for (const c of chunks) rmSync(c.path, { force: true })
+  })
+})
+
+describe('pagesPerChunkFor', () => {
+  const MB = 1024 * 1024
+  it('kleine Text-PDFs: 15 Seiten je Abschnitt', () => {
+    expect(pagesPerChunkFor(0.3 * MB, 40)).toBe(15)
+  })
+  it('große Scans: so wenige Seiten, dass ein Abschnitt unter 10 MB bleibt', () => {
+    // Botanik 2016a: 10 Seiten, ~39 MB → ~3,9 MB je Seite → 2 Seiten je Abschnitt
+    expect(pagesPerChunkFor(39 * MB, 10)).toBe(2)
+  })
+  it('einzelne Riesenseite: trotzdem mindestens 1 Seite', () => {
+    expect(pagesPerChunkFor(50 * MB, 1)).toBe(1)
+  })
+  it('splitPdf nutzt die Größengrenze', async () => {
+    const path = await makePdf('six.pdf', 6, false)
+    const chunks = await splitPdf(path, { maxChunkBytes: 1 })
+    expect(chunks.map((c) => [c.firstPage, c.lastPage])).toEqual([[1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6]])
     for (const c of chunks) rmSync(c.path, { force: true })
   })
 })

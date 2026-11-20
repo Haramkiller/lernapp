@@ -21,6 +21,7 @@ button:disabled { opacity:.4; cursor:not-allowed; }
 .link { display:inline; color:var(--acc); cursor:pointer; text-decoration:underline; }
 progress { width:260px; }
 .error { color:var(--bad); white-space:pre-wrap; margin:8px 0 0; font:13px/1.4 ui-monospace, Consolas, monospace; }
+.notice { color:#ffd479; margin:8px 0 0; font-size:13px; }
 .card { border:1px solid var(--line); border-radius:6px; padding:10px 12px; margin:10px 0; }
 .card header { padding:0 0 6px; border:0; display:flex; gap:8px; align-items:center; }
 .tag { font:12px ui-monospace, Consolas, monospace; background:#0f1117; border:1px solid var(--line); border-radius:3px; padding:1px 6px; color:var(--acc); }

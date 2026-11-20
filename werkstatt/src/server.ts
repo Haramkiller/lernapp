@@ -9,7 +9,7 @@ import { CardDraftSchema, normalize, type Card, type CardDraft, type Topic } fro
 import { markExamRelevant } from './examRelevance'
 import { parseGeneration } from './parse'
 import { askPrompt, examPrompt, scriptPrompt } from './prompts'
-import type { PdfChunk } from './pdf'
+import { SCANNED_NOTICE, type PdfChunk } from './pdf'
 import type { runClaude as RunClaude } from './claude'
 import type { Gateway } from './supabase'
 
@@ -24,8 +24,9 @@ export interface ServerDeps {
   /** null = Supabase nicht konfiguriert (UI zeigt Einrichtungshinweis). */
   gateway: Gateway | null
   runClaude: typeof RunClaude
-  splitPdf: (path: string, pagesPerChunk?: number) => Promise<PdfChunk[]>
-  assertHasText: (path: string) => Promise<void>
+  splitPdf: (path: string) => Promise<PdfChunk[]>
+  /** false = gescannt (keine Textebene); wird dann trotzdem verarbeitet, Claude liest die Seiten als Bild. */
+  hasText: (path: string) => Promise<boolean>
   appOrigin?: string
   port?: number
   uploadDir?: string
@@ -50,6 +51,8 @@ interface Job {
   styleProfile?: string
   examTopics?: string[]
   error?: string
+  /** Hinweis ohne Fehler, z. B. bei gescannten PDFs. */
+  notice?: string
 }
 
 class HttpError extends Error {
@@ -292,10 +295,11 @@ export function createServer(deps: ServerDeps) {
       try {
         const module = (await gw().listModules()).find((m) => m.id === moduleId)
         if (!module) throw new HttpError(404, 'Modul nicht gefunden.')
+        let scanned: boolean
         try {
-          await deps.assertHasText(file.path)
+          scanned = !(await deps.hasText(file.path))
         } catch (e) {
-          throw new HttpError(422, errMsg(e))
+          throw new HttpError(422, `PDF konnte nicht gelesen werden: ${errMsg(e)}`)
         }
         const topics = (await gw().listTopics(moduleId)).map((t) => t.name)
         try {
@@ -306,6 +310,7 @@ export function createServer(deps: ServerDeps) {
         const fileName = (file.originalname.replace(/[^\w.\- äöüÄÖÜß]+/g, '_') || 'datei.pdf').slice(0, 120)
         const jobId = randomUUID()
         const job: Job = { status: 'running', progress: { done: 0, total: pdfChunks.length } }
+        if (scanned) job.notice = SCANNED_NOTICE
         jobs.set(jobId, job)
         const toDelete = [file.path, ...pdfChunks.map((c) => c.path)]
         void runJob(job, { chunks: pdfChunks, kind, moduleName: module.name, styleProfile: module.styleProfile, topics, fileName })

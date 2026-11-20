@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runClaude } from './claude'
-import { assertHasText, splitPdf } from './pdf'
+import { hasText, splitPdf } from './pdf'
 import { createServer, DEFAULT_APP_ORIGIN } from './server'
 import { createSupabaseGateway } from './supabase'
 
@@ -19,7 +19,7 @@ const app = createServer({
   gateway,
   runClaude,
   splitPdf,
-  assertHasText,
+  hasText,
   appOrigin: process.env.APP_ORIGIN || DEFAULT_APP_ORIGIN,
   port,
 })

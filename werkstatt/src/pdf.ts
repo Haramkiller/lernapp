@@ -12,10 +12,29 @@ export interface PdfChunk {
 
 const TMP_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'tmp')
 
-/** Teilt ein PDF in Abschnitte zu je `pagesPerChunk` Seiten (Dateien in werkstatt/tmp/). Seitenzahlen sind 1-basiert im Original. */
-export async function splitPdf(path: string, pagesPerChunk = 15): Promise<PdfChunk[]> {
-  const src = await PDFDocument.load(await readFile(path), { ignoreEncryption: true })
+export interface SplitOptions {
+  /** Höchstens so viele Seiten je Abschnitt (Standard 15). */
+  pagesPerChunk?: number
+  /** Ungefähre Obergrenze je Abschnitt in Bytes (Standard 10 MB). Gescannte Seiten sind groß; Claude liest PDFs nur bis ca. 32 MB. */
+  maxChunkBytes?: number
+}
+
+const MAX_PAGES_PER_CHUNK = 15
+const MAX_CHUNK_BYTES = 10 * 1024 * 1024
+
+/** Seiten je Abschnitt: höchstens `maxPages`, aber so wenige, dass ein Abschnitt (geschätzt nach Ø-Seitengröße) unter `maxBytes` bleibt. */
+export function pagesPerChunkFor(fileBytes: number, totalPages: number, maxPages = MAX_PAGES_PER_CHUNK, maxBytes = MAX_CHUNK_BYTES): number {
+  if (totalPages <= 0) return maxPages
+  const perPage = fileBytes / totalPages
+  return Math.max(1, Math.min(maxPages, Math.floor(maxBytes / Math.max(perPage, 1))))
+}
+
+/** Teilt ein PDF in Abschnitte (Dateien in werkstatt/tmp/). Seitenzahlen sind 1-basiert im Original. */
+export async function splitPdf(path: string, opts: SplitOptions = {}): Promise<PdfChunk[]> {
+  const bytes = await readFile(path)
+  const src = await PDFDocument.load(bytes, { ignoreEncryption: true })
   const total = src.getPageCount()
+  const pagesPerChunk = pagesPerChunkFor(bytes.length, total, opts.pagesPerChunk, opts.maxChunkBytes)
   await mkdir(TMP_DIR, { recursive: true })
   const base = basename(path, extname(path)).replace(/[^\w.-]+/g, '_')
   const stamp = Date.now().toString(36)
@@ -35,8 +54,8 @@ export async function splitPdf(path: string, pagesPerChunk = 15): Promise<PdfChu
 const MIN_CHARS = 20
 const PAGES_TO_CHECK = 5
 
-export const SCANNED_MESSAGE =
-  'Dieses PDF scheint gescannt zu sein und enthält keinen auslesbaren Text. Bitte ein PDF mit Textebene verwenden (z. B. per OCR erzeugt).'
+export const SCANNED_NOTICE =
+  'Dieses PDF ist gescannt (keine Textebene). Claude liest die Seiten als Bild – bitte die Karten in der Vorschau besonders genau prüfen.'
 
 /** true, wenn auf den ersten Seiten auslesbarer Text steht (mind. ~20 Zeichen ohne Leerraum). */
 export async function hasText(path: string): Promise<boolean> {
@@ -60,9 +79,4 @@ export async function hasText(path: string): Promise<boolean> {
   } finally {
     await doc.destroy()
   }
-}
-
-/** Wirft die „gescannt“-Fehlermeldung, falls kein Text vorhanden ist. */
-export async function assertHasText(path: string): Promise<void> {
-  if (!(await hasText(path))) throw new Error(SCANNED_MESSAGE)
 }
