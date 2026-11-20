@@ -1,6 +1,6 @@
 import { spawn as nodeSpawn, type ChildProcess, type SpawnOptions } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { delimiter, join } from 'node:path'
+import { join } from 'node:path'
 
 export type SpawnFn = (cmd: string, args: string[], opts: SpawnOptions) => ChildProcess
 
@@ -36,7 +36,8 @@ const realDeps = (): ResolveDeps => ({ exists: existsSync, env: process.env, pla
 /** Findet das Claude-CLI ohne Shell: claude.exe (PATH, ~/.local/bin) oder npm-global cli.js mit node. */
 export function resolveClaude(deps: ResolveDeps = realDeps()): ResolvedClaude | null {
   const { exists, env, platform } = deps
-  const pathDirs = (env.PATH ?? env.Path ?? '').split(delimiter).filter(Boolean)
+  // Trennzeichen der Zielplattform, nicht des laufenden Rechners (sonst schlägt der Windows-Fall unter Linux fehl).
+  const pathDirs = (env.PATH ?? env.Path ?? '').split(platform === 'win32' ? ';' : ':').filter(Boolean)
   if (platform !== 'win32') {
     for (const d of pathDirs) if (exists(join(d, 'claude'))) return { cmd: join(d, 'claude'), prefixArgs: [] }
     return null

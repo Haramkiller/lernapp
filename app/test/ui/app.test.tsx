@@ -221,7 +221,7 @@ describe('App: eigene Datenbank vor der Anmeldung', () => {
     expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
     expect(await loadOverride()).toEqual({ url: 'https://b.supabase.co', key: 'anon-b' })
     await vi.waitFor(() => expect(made.at(-1)).toBe('https://b.supabase.co'))
-  })
+  }, 15_000) // tippt viele Zeichen einzeln; unter Last (CI) reichen die 5 s Standard nicht
 
   it('mit eigener Datenbank: zurück zur eingebauten', async () => {
     await saveOverride({ url: 'https://b.supabase.co', key: 'anon-b' })
