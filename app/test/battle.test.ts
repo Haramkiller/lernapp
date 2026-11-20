@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { applyAnswer, endBattle, hpPercent, startBattle } from '../src/game/battle'
+import { RESTED_LUCKY_CHANCE, applyAnswer, endBattle, hpPercent, startBattle } from '../src/game/battle'
 
 const never = () => 0.99 // kein Glückstreffer
 const R = { outcome: 'right' as const, elapsedDays: 1 }
@@ -25,6 +25,11 @@ describe('battle', () => {
     expect(applyAnswer(startBattle(5), { outcome: 'right', elapsedDays: 7 }, never).last).toMatchObject({ damage: 20, crit: true })
     expect(applyAnswer(startBattle(5), { outcome: 'right', elapsedDays: 6 }, never).last!.crit).toBe(false)
     expect(applyAnswer(startBattle(5), { outcome: 'right', elapsedDays: null }, never).last!.crit).toBe(false)
+  })
+
+  it('ausgeruht: Glückstreffer schon bei rng 0.2', () => {
+    expect(applyAnswer(startBattle(5), R, () => 0.2).last!.lucky).toBe(false)
+    expect(applyAnswer(startBattle(5), R, () => 0.2, RESTED_LUCKY_CHANCE).last!.lucky).toBe(true)
   })
 
   it('Glückstreffer +5 bei rng < 0.1', () => {

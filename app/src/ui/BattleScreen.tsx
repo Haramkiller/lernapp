@@ -3,7 +3,7 @@ import { CardDraftSchema, type Card, type Module } from '@lernapp/shared'
 import { db } from '../data/db'
 import { loadSettings } from '../data/settings'
 import { recordReview } from '../data/sync'
-import { applyAnswer, endBattle, hpPercent, startBattle, type Battle } from '../game/battle'
+import { LUCKY_CHANCE, RESTED_LUCKY_CHANCE, applyAnswer, endBattle, hpPercent, startBattle, type Battle } from '../game/battle'
 import { bossFor } from '../game/bosses'
 import { buildQueue, newDoneKey, type Settings } from '../session/queue'
 import { toRating, type Outcome } from '../srs/grading'
@@ -26,8 +26,10 @@ type Props = {
   moduleId?: string
   now?: () => Date
   rng?: Rng
-  /** Wird einmal aufgerufen, wenn der Kampf beendet ist (z. B. für den Sync). */
-  onFinished?: () => void
+  /** Pause am Lagerfeuer gemacht: mehr Glückstreffer. Standard: false. */
+  rested?: boolean
+  /** Wird einmal aufgerufen, wenn der Kampf beendet ist (z. B. für den Sync), mit der Zahl gespeicherter Antworten. */
+  onFinished?: (answered: number) => void
   onExit: () => void
   /** Inhalt des „Nachfragen“-Dialogs; Lebensdauer (Weiter, Beenden, Verlassen) regelt BattleScreen. */
   renderAsk?: (card: Card, answer: Answer, close: () => void) => ReactNode
@@ -51,6 +53,7 @@ export function BattleScreen({
   moduleId,
   now = () => new Date(),
   rng = Math.random,
+  rested = false,
   onFinished,
   onExit,
   renderAsk,
@@ -108,8 +111,9 @@ export function BattleScreen({
   useEffect(() => {
     if (done && !finished.current) {
       finished.current = true
-      onFinished?.()
+      onFinished?.(counts.right + counts.partial + counts.wrong)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done, onFinished])
 
   if (loadError) {
@@ -183,7 +187,7 @@ export function BattleScreen({
         return review(p ?? newSrsState(t), toRating(outcome), t, { cardId: card.id, retention })
       })
       // Erst eine gespeicherte Antwort zählt im Kampf.
-      setBattle(applyAnswer(battle, { outcome, elapsedDays: elapsedDays(prev, t) }, rng))
+      setBattle(applyAnswer(battle, { outcome, elapsedDays: elapsedDays(prev, t) }, rng, rested ? RESTED_LUCKY_CHANCE : LUCKY_CHANCE))
       setTurn((n) => n + 1)
       setCounts((c) => ({ ...c, [outcome]: c[outcome] + 1 }))
       setResult({ outcome, answer: detail })
@@ -209,6 +213,7 @@ export function BattleScreen({
         <div className="row between">
           <p className="progress pixel">
             {index + 1} / {cards.length}
+            {rested && <span className="rested-badge">Ausgeruht · mehr Glückstreffer</span>}
           </p>
           {/* Während des Speichern gesperrt: sonst änderte sich das Ergebnis nach der Anzeige. */}
           <button type="button" onClick={() => setEnded(true)} disabled={saving}>

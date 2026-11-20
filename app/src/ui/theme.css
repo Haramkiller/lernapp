@@ -571,3 +571,16 @@ button.module {
     height: min(80vh, 620px);
   }
 }
+
+/* Ausgeruht (Teil 2) */
+.rested-badge {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #2f5d3a;
+  color: #d8f5c8;
+  font-family: system-ui, sans-serif;
+  font-size: 0.75rem;
+  vertical-align: middle;
+}

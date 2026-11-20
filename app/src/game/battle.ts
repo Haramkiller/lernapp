@@ -23,7 +23,9 @@ const BASE_DAMAGE = 10
 const PARTIAL_DAMAGE = 5
 const TIER_BONUS: Record<Tier, number> = { 1: 0, 2: 3, 3: 6 }
 const CRIT_AFTER_DAYS = 7
-const LUCKY_CHANCE = 0.1
+export const LUCKY_CHANCE = 0.1
+/** „Ausgeruht“ (Pause am Lagerfeuer): mehr Glückstreffer für den ganzen Kampf. */
+export const RESTED_LUCKY_CHANCE = 0.25
 const LUCKY_BONUS = 5
 
 const tierOf = (combo: number): Tier => (combo >= 6 ? 3 : combo >= 3 ? 2 : 1)
@@ -34,7 +36,12 @@ export function startBattle(total: number): Battle {
 }
 
 /** Wertet eine gespeicherte Antwort aus. Kein Tempobonus: Zeit spielt keine Rolle. */
-export function applyAnswer(b: Battle, a: { outcome: Outcome; elapsedDays: number | null }, rng: Rng): Battle {
+export function applyAnswer(
+  b: Battle,
+  a: { outcome: Outcome; elapsedDays: number | null },
+  rng: Rng,
+  luckyChance: number = LUCKY_CHANCE,
+): Battle {
   if (b.finished) return b
   let combo = b.combo
   let damage = 0
@@ -45,7 +52,7 @@ export function applyAnswer(b: Battle, a: { outcome: Outcome; elapsedDays: numbe
     damage = BASE_DAMAGE + TIER_BONUS[tierOf(combo)]
     crit = a.elapsedDays !== null && a.elapsedDays >= CRIT_AFTER_DAYS
     if (crit) damage *= 2
-    lucky = rng() < LUCKY_CHANCE
+    lucky = rng() < luckyChance
     if (lucky) damage += LUCKY_BONUS
   } else if (a.outcome === 'partial') {
     damage = PARTIAL_DAMAGE

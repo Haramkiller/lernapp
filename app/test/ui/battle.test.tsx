@@ -178,6 +178,41 @@ describe('BattleScreen: Kampf', () => {
     expect(onFinished).toHaveBeenCalledTimes(1)
   })
 
+  it('ausgeruht: Hinweis und mehr Glückstreffer', async () => {
+    await cards(2)
+    render(<BattleScreen now={() => NOW} rng={() => 0.2} rested onExit={vi.fn()} />)
+    expect(await screen.findByText(/Ausgeruht/)).toBeInTheDocument()
+    await right()
+    expect(await screen.findByText('Glückstreffer!')).toBeInTheDocument()
+  })
+
+  it('nicht ausgeruht: kein Hinweis, kein Glückstreffer bei rng 0.2', async () => {
+    await cards(2)
+    render(<BattleScreen now={() => NOW} rng={() => 0.2} onExit={vi.fn()} />)
+    await right()
+    expect(await screen.findByRole('button', { name: 'Weiter' })).toBeInTheDocument()
+    expect(screen.queryByText(/Ausgeruht/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Glückstreffer!')).not.toBeInTheDocument()
+  })
+
+  it('onFinished meldet die Zahl gespeicherter Antworten', async () => {
+    await cards(3)
+    const onFinished = vi.fn()
+    render(<BattleScreen now={() => NOW} rng={NO_LUCK} onFinished={onFinished} onExit={vi.fn()} />)
+    await right()
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Beenden' })).toBeEnabled())
+    await userEvent.click(screen.getByRole('button', { name: 'Beenden' }))
+    await vi.waitFor(() => expect(onFinished).toHaveBeenCalledWith(1))
+  })
+
+  it('Beenden ohne Antwort: onFinished mit 0', async () => {
+    await cards(3)
+    const onFinished = vi.fn()
+    render(<BattleScreen now={() => NOW} rng={NO_LUCK} onFinished={onFinished} onExit={vi.fn()} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Beenden' }))
+    await vi.waitFor(() => expect(onFinished).toHaveBeenCalledWith(0))
+  })
+
   it('Speichern schlägt fehl: kein Schaden', async () => {
     await cards(2)
     const spy = vi.spyOn(db.states, 'put').mockRejectedValueOnce(new Error('voll'))
