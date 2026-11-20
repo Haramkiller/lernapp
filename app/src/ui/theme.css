@@ -584,3 +584,255 @@ button.module {
   font-size: 0.75rem;
   vertical-align: middle;
 }
+
+/* Waldplatz und Karte (Teil 2) */
+.camp {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.scene {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  aspect-ratio: 3 / 4;
+  border: 3px solid #000;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+}
+.scene img,
+.map img,
+.region-panel img {
+  image-rendering: pixelated;
+}
+.scene-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.campfire {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  border-radius: 50%;
+}
+.campfire .sprite {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+.campfire:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: -8px;
+}
+.fire-glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 360%;
+  height: 160%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(closest-side, rgba(255, 170, 60, 0.35), transparent);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  animation: fire-flicker 1.6s ease-in-out infinite alternate;
+}
+@keyframes fire-flicker {
+  from {
+    opacity: 0.7;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.scene-menu {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(20, 18, 31, 0.85);
+}
+.scene-hint {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  margin: 0;
+  padding: 6px 10px;
+  border: 2px solid #000;
+  border-radius: 8px;
+  background: rgba(20, 18, 31, 0.85);
+  font-size: 0.85rem;
+  text-align: center;
+}
+.camp-menu .sync {
+  margin-top: 0;
+}
+.strays {
+  align-items: center;
+  justify-content: center;
+}
+
+.map-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12px;
+  overflow-y: auto;
+  background: rgba(8, 6, 16, 0.75);
+}
+.map-window {
+  width: 100%;
+  max-width: 480px;
+  border: 3px solid #000;
+  border-radius: 14px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.map-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--panel-2);
+  border-bottom: 3px solid #000;
+}
+.map-head .quest {
+  margin: 0;
+  color: var(--accent);
+}
+.map {
+  position: relative;
+  aspect-ratio: 3 / 4;
+}
+.map-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.map-fog,
+.map-flag {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+.map-fog {
+  width: 38%;
+  padding: 0;
+  border: 0;
+  background: none;
+  opacity: 0.95;
+}
+.map-fog:disabled {
+  cursor: default;
+  opacity: 0.95;
+}
+.map-fog img {
+  display: block;
+  width: 100%;
+}
+.map-flag {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 46%;
+  padding: 4px 8px;
+  border: 2px solid #000;
+  border-radius: 8px;
+  background: rgba(31, 27, 51, 0.92);
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+.map-flag::before {
+  content: '⚑';
+  color: var(--wrong);
+}
+.map-flag.selected {
+  outline: 3px solid var(--accent);
+}
+.flag-title {
+  font-weight: 700;
+}
+.threat {
+  color: var(--wrong);
+}
+.region-panel {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-top: 3px solid #000;
+}
+.region-module h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.region-module p {
+  margin: 2px 0 6px;
+}
+.region-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.region-top > div {
+  flex: 1;
+}
+.region-icon {
+  width: 48px;
+}
+.region-boss {
+  width: 64px;
+}
+.threat-bar span {
+  background: var(--wrong);
+}
+.topic-flags {
+  list-style: none;
+  margin: 10px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.topic-flags li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.topic-flags li > span:first-child {
+  margin-right: auto;
+}
+.chip {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: var(--panel-2);
+}
+.chip.due {
+  color: var(--partial);
+}
+.chip.fresh {
+  color: var(--accent);
+}
+.chip.secure {
+  color: var(--right);
+}
+.region-hint {
+  padding: 10px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fire-glow {
+    animation: none;
+  }
+}
