@@ -114,6 +114,10 @@ alter table public.cards enable row level security;
 alter table public.card_states enable row level security;
 alter table public.review_logs enable row level security;
 
+-- Tabellenrechte: Neuere Supabase-Projekte vergeben sie für neue Tabellen nicht mehr automatisch.
+-- Nur angemeldete Nutzer (authenticated), nie anon; welche Zeilen, regeln die Policies unten.
+grant select, insert, update, delete on public.modules, public.topics, public.cards, public.card_states, public.review_logs to authenticated;
+
 -- (select auth.uid()) statt auth.uid(): Postgres wertet es einmal pro Abfrage aus, nicht pro Zeile (Supabase-Empfehlung).
 do $$
 declare
@@ -174,6 +178,7 @@ alter table public.ask_tickets enable row level security;
 drop policy if exists ask_tickets_insert_own on public.ask_tickets;
 create policy ask_tickets_insert_own on public.ask_tickets
   for insert to authenticated with check ((select auth.uid()) = user_id);
+grant insert on public.ask_tickets to authenticated;
 -- Keine select/update/delete-Policies: Tickets liest und löscht nur redeem_ask_ticket.
 
 create or replace function public.redeem_ask_ticket(p_nonce text)
