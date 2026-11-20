@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { Card, Module, Topic } from '@lernapp/shared'
-import { db, type LogEntry, type StateRow } from '../src/data/db'
+import { db, type GameItem, type LogEntry, type StateRow } from '../src/data/db'
 import { RemoteError, type Cursors, type Pulled, type Remote, type SyncTable } from '../src/data/remote'
 import { recordReview, sync } from '../src/data/sync'
 import { newSrsState, review } from '../src/srs/scheduler'
@@ -19,6 +19,7 @@ function fakeRemote(opts: { fail?: boolean; failPush?: boolean; poison?: string[
     topics: new Map(),
     cards: new Map(),
     states: new Map(),
+    game: new Map(),
   }
   const r = {
     fail: opts.fail ?? false,
@@ -36,7 +37,7 @@ function fakeRemote(opts: { fail?: boolean; failPush?: boolean; poison?: string[
     state: (cardId: string) => tables.states.get(cardId)?.item as StateRow | undefined,
     async pullSince(since: Cursors): Promise<Pulled> {
       if (r.fail) throw new Error('offline')
-      const out: Record<SyncTable, unknown[]> = { modules: [], topics: [], cards: [], states: [] }
+      const out: Record<SyncTable, unknown[]> = { modules: [], topics: [], cards: [], states: [], game: [] }
       const cursors: Partial<Cursors> = {}
       for (const t of Object.keys(tables) as SyncTable[]) {
         for (const row of tables[t].values()) {
@@ -61,6 +62,13 @@ function fakeRemote(opts: { fail?: boolean; failPush?: boolean; poison?: string[
       if (bad) throw new RemoteError('FK violation ' + bad.cardId, true)
       for (const x of l) r.logs.set(x.id, x)
     },
+    gamePushes: [] as GameItem[][],
+    async pushGame(g: GameItem[]) {
+      if (r.fail || r.failPush) throw new Error('offline')
+      r.gamePushes.push(g)
+      for (const x of g) r.put('game', x.id, x)
+    },
+    game: (id: string) => tables.game.get(id)?.item as GameItem | undefined,
   } satisfies Remote & Record<string, unknown>
   return r
 }
@@ -300,5 +308,31 @@ describe('sync: Push-Fehler', () => {
     expect(res.pushError).toBe('bad request')
     expect(await db.dead.count()).toBe(0)
     expect(await db.outbox.count()).toBe(4)
+  })
+})
+
+describe('sync: Spieldaten', () => {
+  const item = (id: string, at: Date, bossId: string): GameItem => ({ id, data: { bossId }, updatedAt: at.toISOString() })
+
+  it('pro ID geht nur der neueste Eintrag raus, die Outbox wird leer', async () => {
+    await db.outbox.bulkAdd([
+      { kind: 'game', payload: item('area:m1', T2, 'neu') },
+      { kind: 'game', payload: item('area:m1', T1, 'alt') },
+    ])
+    const remote = fakeRemote()
+    await sync(remote, T2)
+    expect(remote.gamePushes).toEqual([[item('area:m1', T2, 'neu')]])
+    expect(await db.outbox.count()).toBe(0)
+  })
+
+  it('Pull übernimmt nur neuere Zeilen und merkt sich den Cursor', async () => {
+    const remote = fakeRemote()
+    remote.put('game', 'area:m1', item('area:m1', T2, 'server'))
+    remote.put('game', 'area:m2', item('area:m2', T1, 'server'))
+    await db.game.bulkPut([item('area:m1', T1, 'lokal-alt'), item('area:m2', T2, 'lokal-neu')])
+    await sync(remote, T2)
+    expect((await db.game.get('area:m1'))?.data.bossId).toBe('server')
+    expect((await db.game.get('area:m2'))?.data.bossId).toBe('lokal-neu')
+    expect((await db.meta.get('lastPull:game'))?.value).toBe(remote.syncedAt('game', 'area:m2'))
   })
 })

@@ -16,9 +16,9 @@ import {
   type TopicRow,
 } from '@lernapp/shared'
 import type { SrsState } from '../srs/scheduler'
-import type { LogEntry, StateRow } from './db'
+import type { GameItem, LogEntry, StateRow } from './db'
 
-export type SyncTable = 'modules' | 'topics' | 'cards' | 'states'
+export type SyncTable = 'modules' | 'topics' | 'cards' | 'states' | 'game'
 /** Pro Tabelle ein ISO-Zeitstempel (Serverzeit `synced_at`). */
 export type Cursors = Record<SyncTable, string>
 
@@ -27,6 +27,7 @@ export type Pulled = {
   topics: Topic[]
   cards: Card[]
   states: StateRow[]
+  game: GameItem[]
   /** Höchstes gesehenes `synced_at` je Tabelle; fehlt, wenn die Tabelle keine Zeilen lieferte. */
   cursors: Partial<Cursors>
 }
@@ -38,7 +39,13 @@ export interface Remote {
   pushStates(s: StateRow[]): Promise<void>
   /** Upsert auf `id` (append-only, idempotent). */
   pushLogs(l: LogEntry[]): Promise<void>
+  /** Bedingter Upsert auf (user_id, id). */
+  pushGame(g: GameItem[]): Promise<void>
 }
+
+type GameRow = { id: string; data: Record<string, unknown>; updated_at: string }
+const gameToRow = (g: GameItem): GameRow => ({ id: g.id, data: g.data, updated_at: g.updatedAt })
+const rowToGame = (r: GameRow): GameItem => ({ id: r.id, data: r.data, updatedAt: isoUtc(r.updated_at) })
 
 /** Fehler des Servers; `permanent` = zeilenbezogener Datenfehler (400/409/422, Postgres 23xxx): Wiederholen hilft nicht. */
 export class RemoteError extends Error {
@@ -108,26 +115,30 @@ export function createSupabaseRemote(client: SupabaseClient): Remote {
   type Synced<T> = T & { synced_at: string }
   return {
     async pullSince(since) {
-      const [modules, topics, cards, states] = await Promise.all([
+      const [modules, topics, cards, states, game] = await Promise.all([
         fetchAll<Synced<ModuleRow>>('modules', 'id', since.modules),
         fetchAll<Synced<TopicRow>>('topics', 'id', since.topics),
         fetchAll<Synced<CardRow>>('cards', 'id', since.cards),
         fetchAll<Synced<StateDbRow<SrsState>>>('card_states', 'card_id', since.states),
+        fetchAll<Synced<GameRow>>('game_items', 'id', since.game),
       ])
       const cursors: Partial<Cursors> = {}
       if (modules.cursor) cursors.modules = modules.cursor
       if (topics.cursor) cursors.topics = topics.cursor
       if (cards.cursor) cursors.cards = cards.cursor
       if (states.cursor) cursors.states = states.cursor
+      if (game.cursor) cursors.game = game.cursor
       return {
         modules: modules.rows.map(rowToModule),
         topics: topics.rows.map(rowToTopic),
         cards: cards.rows.map(rowToCard),
         states: states.rows.map(rowToState),
+        game: game.rows.map(rowToGame),
         cursors,
       }
     },
     pushStates: (s) => upsert('card_states', s.map(stateToRow), 'card_id'),
     pushLogs: (l) => upsert('review_logs', l.map(logToRow), 'id'),
+    pushGame: (g) => upsert('game_items', g.map(gameToRow), 'user_id,id'),
   }
 }

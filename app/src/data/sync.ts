@@ -1,4 +1,4 @@
-import { db, type LogEntry, type OutboxEntry, type StateRow } from './db'
+import { db, type GameItem, type LogEntry, type OutboxEntry, type StateRow } from './db'
 import { isPermanentError, type Cursors, type Remote, type SyncTable } from './remote'
 import type { ReviewLog, SrsState } from '../srs/scheduler'
 import { newDoneKey } from '../session/queue'
@@ -107,25 +107,30 @@ async function pushOutbox(remote: Remote): Promise<{ pushed: number; error?: unk
   const entries = (await db.outbox.toArray()) as (OutboxEntry & { id: number })[]
 
   // Pro Karte zählt nur der neueste State; die älteren Einträge gehen mit derselben Einheit raus.
+  // Spieldaten ebenso: je ID nur die neueste Fassung.
   const byCard = new Map<string, Unit<StateRow>>()
+  const byGame = new Map<string, Unit<GameItem>>()
   const logUnits: Unit<LogEntry>[] = []
-  for (const e of entries) {
-    if (e.kind === 'log') {
-      logUnits.push({ ids: [e.id], item: e.payload })
-      continue
-    }
-    const unit = byCard.get(e.payload.cardId)
-    if (!unit) byCard.set(e.payload.cardId, { ids: [e.id], item: e.payload })
+  const latest = <T extends { updatedAt: string }>(map: Map<string, Unit<T>>, key: string, id: number, item: T) => {
+    const unit = map.get(key)
+    if (!unit) map.set(key, { ids: [id], item })
     else {
-      unit.ids.push(e.id)
-      if (Date.parse(e.payload.updatedAt) >= Date.parse(unit.item.updatedAt)) unit.item = e.payload
+      unit.ids.push(id)
+      if (Date.parse(item.updatedAt) >= Date.parse(unit.item.updatedAt)) unit.item = item
     }
+  }
+  for (const e of entries) {
+    if (e.kind === 'log') logUnits.push({ ids: [e.id], item: e.payload })
+    else if (e.kind === 'state') latest(byCard, e.payload.cardId, e.id, e.payload)
+    else latest(byGame, e.payload.id, e.id, e.payload)
   }
 
   const states = await pushUnits([...byCard.values()], (s) => remote.pushStates(s))
   if (states.error) return states
   const logs = await pushUnits(logUnits, (l) => remote.pushLogs(l))
-  return { pushed: states.pushed + logs.pushed, error: logs.error }
+  if (logs.error) return { pushed: states.pushed + logs.pushed, error: logs.error }
+  const game = await pushUnits([...byGame.values()], (g) => remote.pushGame(g))
+  return { pushed: states.pushed + logs.pushed + game.pushed, error: game.error }
 }
 
 /** Übernimmt Zeilen nur, wenn sie neuer sind als die lokale Fassung; liefert die Anzahl übernommener. */
@@ -144,7 +149,7 @@ async function applyNewer<T extends { updatedAt: string }>(
   return applied
 }
 
-const TABLES: SyncTable[] = ['modules', 'topics', 'cards', 'states']
+const TABLES: SyncTable[] = ['modules', 'topics', 'cards', 'states', 'game']
 const EPOCH = '1970-01-01T00:00:00.000Z'
 /** Überlappung beim Pull: fängt Transaktionen ab, die mit älterem `synced_at` später sichtbar werden. */
 export const PULL_OVERLAP_MS = 5000
@@ -165,12 +170,13 @@ export async function sync(
   // Pull läuft auch, wenn der Push scheiterte; ein Pull-Fehler bricht den Sync ab.
   const incoming = await remote.pullSince(since)
 
-  const pulled = await db.transaction('rw', [db.modules, db.topics, db.cards, db.states, db.meta], async () => {
+  const pulled = await db.transaction('rw', [db.modules, db.topics, db.cards, db.states, db.game, db.meta], async () => {
     let n = 0
     n += await applyNewer(incoming.modules, (m) => db.modules.get(m.id), (m) => db.modules.put(m))
     n += await applyNewer(incoming.topics, (t) => db.topics.get(t.id), (t) => db.topics.put(t))
     n += await applyNewer(incoming.cards, (c) => db.cards.get(c.id), (c) => db.cards.put(c))
     n += await applyNewer(incoming.states, (s) => db.states.get(s.cardId), (s) => db.states.put(s))
+    n += await applyNewer(incoming.game, (g) => db.game.get(g.id), (g) => db.game.put(g))
     for (const t of TABLES) {
       const next = incoming.cursors[t]
       if (next && Date.parse(next) > Date.parse(cursors[t])) await db.meta.put({ key: cursorKey(t), value: next })

@@ -40,7 +40,7 @@ function stubClient(data: Record<string, Row[]>, maxRows: number, failWith?: { s
 
 const base = { module_id: 'm', name: 'n', updated_at: '2026-03-10T11:00:00+01:00' }
 const epoch = '1970-01-01T00:00:00.000Z'
-const since = { modules: epoch, topics: epoch, cards: epoch, states: epoch }
+const since = { modules: epoch, topics: epoch, cards: epoch, states: epoch, game: epoch }
 
 describe('createSupabaseRemote.pullSince', () => {
   it('Server liefert Seiten kleiner als angefragt: nichts wird übersprungen, auch bei gleichem synced_at', async () => {
@@ -102,5 +102,30 @@ describe('Fehlerklassifikation', () => {
   })
   it('RLS-Verstoß (403, 42501) ist vorübergehend', async () => {
     await expect(push(403, '42501')).rejects.toMatchObject({ permanent: false })
+  })
+})
+
+describe('Spieldaten (game_items)', () => {
+  it('Pull liest game_items und mappt die Felder', async () => {
+    const game_items: Row[] = [
+      { id: 'area:m1', user_id: 'u', data: { bossId: 'sporenhexe' }, updated_at: '2026-03-10T11:00:00+01:00', synced_at: '2026-03-10T10:00:00.5+00:00' },
+    ]
+    const { client } = stubClient({ game_items }, 10)
+    const res = await createSupabaseRemote(client).pullSince(since)
+    expect(res.game).toEqual([{ id: 'area:m1', data: { bossId: 'sporenhexe' }, updatedAt: '2026-03-10T10:00:00.000Z' }])
+    expect(res.cursors.game).toBe('2026-03-10T10:00:00.500Z')
+  })
+
+  it('pushGame: Upsert auf (user_id, id), ohne user_id im Datensatz', async () => {
+    const calls: { table: string; rows: object[]; opts: unknown }[] = []
+    const client = {
+      from: (table: string) => ({
+        upsert: async (rows: object[], opts: unknown) => (calls.push({ table, rows, opts }), { error: null, status: 201 }),
+      }),
+    } as unknown as SupabaseClient
+    await createSupabaseRemote(client).pushGame([{ id: 'rest', data: { at: 'x' }, updatedAt: '2026-03-10T10:00:00.000Z' }])
+    expect(calls).toEqual([
+      { table: 'game_items', rows: [{ id: 'rest', data: { at: 'x' }, updated_at: '2026-03-10T10:00:00.000Z' }], opts: { onConflict: 'user_id,id' } },
+    ])
   })
 })

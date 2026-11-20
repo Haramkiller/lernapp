@@ -57,11 +57,23 @@ create table if not exists public.review_logs (
   elapsed_days real not null default 0
 );
 
+-- Stufe 1b, Teil 2: echte Spielentscheidungen und Funde (gewähltes Gebiet je Modul, letzter Kampf, …).
+-- id vergibt der Client (z. B. 'area:<modul-id>', 'rest'); eindeutig je Nutzer.
+create table if not exists public.game_items (
+  id text not null,
+  user_id uuid not null default auth.uid() references auth.users on delete cascade,
+  data jsonb not null,
+  updated_at timestamptz not null default now(),
+  synced_at timestamptz not null default clock_timestamp(),
+  primary key (user_id, id)
+);
+
 -- Pull-Cursor der Clients: synced_at (Serverzeit), Keyset-Paginierung über (synced_at, Schlüssel).
 create index if not exists modules_user_synced_idx on public.modules (user_id, synced_at, id);
 create index if not exists topics_user_synced_idx on public.topics (user_id, synced_at, id);
 create index if not exists cards_user_synced_idx on public.cards (user_id, synced_at, id);
 create index if not exists card_states_user_synced_idx on public.card_states (user_id, synced_at, card_id);
+create index if not exists game_items_user_synced_idx on public.game_items (user_id, synced_at, id);
 create index if not exists review_logs_user_reviewed_idx on public.review_logs (user_id, reviewed_at);
 create index if not exists review_logs_card_idx on public.review_logs (card_id);
 create index if not exists topics_module_idx on public.topics (module_id);
@@ -94,7 +106,7 @@ do $$
 declare
   t text;
 begin
-  foreach t in array array['modules', 'topics', 'cards', 'card_states'] loop
+  foreach t in array array['modules', 'topics', 'cards', 'card_states', 'game_items'] loop
     execute format('drop trigger if exists %I on public.%I', t || '_synced_insert', t);
     execute format('drop trigger if exists %I on public.%I', t || '_lww_update', t);
     execute format(
@@ -113,17 +125,18 @@ alter table public.topics enable row level security;
 alter table public.cards enable row level security;
 alter table public.card_states enable row level security;
 alter table public.review_logs enable row level security;
+alter table public.game_items enable row level security;
 
 -- Tabellenrechte: Neuere Supabase-Projekte vergeben sie für neue Tabellen nicht mehr automatisch.
 -- Nur angemeldete Nutzer (authenticated), nie anon; welche Zeilen, regeln die Policies unten.
-grant select, insert, update, delete on public.modules, public.topics, public.cards, public.card_states, public.review_logs to authenticated;
+grant select, insert, update, delete on public.modules, public.topics, public.cards, public.card_states, public.review_logs, public.game_items to authenticated;
 
 -- (select auth.uid()) statt auth.uid(): Postgres wertet es einmal pro Abfrage aus, nicht pro Zeile (Supabase-Empfehlung).
 do $$
 declare
   t text;
 begin
-  foreach t in array array['modules', 'topics', 'cards', 'card_states', 'review_logs'] loop
+  foreach t in array array['modules', 'topics', 'cards', 'card_states', 'review_logs', 'game_items'] loop
     execute format('drop policy if exists %I on public.%I', t || '_select_own', t);
     execute format('drop policy if exists %I on public.%I', t || '_insert_own', t);
     execute format('drop policy if exists %I on public.%I', t || '_update_own', t);
