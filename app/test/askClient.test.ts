@@ -18,15 +18,15 @@ describe('trimHistory', () => {
 })
 
 describe('askWerkstatt', () => {
-  it('ruft genau /api/ask mit Bearer-Token auf und kürzt Antwort und Verlauf', async () => {
+  it('ruft genau /api/ask mit Einmal-Ticket statt Zugriffstoken auf und kürzt Antwort und Verlauf', async () => {
     const fetchMock = vi.fn().mockResolvedValue(json(200, { answer: 'Antwort' }))
     vi.stubGlobal('fetch', fetchMock)
     const history: HistoryEntry[] = Array.from({ length: 22 }, () => ({ role: 'user', text: 'y'.repeat(4500) }))
-    expect(await askWerkstatt(card, 'a'.repeat(2500), history, 'tok123')).toBe('Antwort')
+    expect(await askWerkstatt(card, 'a'.repeat(2500), history, 'ticket123')).toBe('Antwort')
     const [url, init] = fetchMock.mock.calls[0]!
     expect(url).toBe('http://127.0.0.1:5174/api/ask')
     expect(init.method).toBe('POST')
-    expect(init.headers.Authorization).toBe('Bearer tok123')
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json', 'X-Ask-Ticket': 'ticket123' })
     const body = JSON.parse(init.body)
     expect(body.userAnswer).toHaveLength(2000)
     expect(body.history).toHaveLength(20)

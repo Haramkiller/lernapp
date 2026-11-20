@@ -35,6 +35,10 @@ const sessionCookie = (r: { headers: Record<string, unknown> }): string | undefi
 
 const APP = 'https://me.github.io'
 
+// Einmal-Tickets der App (43 Zeichen base64url); die Fälschung akzeptiert jedes „ok…“-Ticket genau einmal.
+let ticketNo = 0
+const ticket = (prefix = 'ok') => (prefix + String(++ticketNo)).padEnd(43, 'x')
+
 const choiceDraft = (topic: string, extra: object = {}) => ({
   topic,
   type: 'free',
@@ -49,6 +53,7 @@ const choiceDraft = (topic: string, extra: object = {}) => ({
 
 function fakeGateway(init: { modules?: Module[]; topics?: Topic[]; cards?: Card[] } = {}) {
   let loggedIn = false
+  const used = new Set<string>()
   const state = {
     modules: init.modules ?? [{ id: 'm1', name: 'Botanik', examDate: null, styleProfile: null, updatedAt: '2020-01-01T00:00:00.000Z' }],
     topics: init.topics ?? [],
@@ -57,7 +62,11 @@ function fakeGateway(init: { modules?: Module[]; topics?: Topic[]; cards?: Card[
   const calls = { upsertCards: [] as Card[][], upsertTopics: [] as Topic[][], upsertModule: [] as Module[] }
   const gateway: Gateway = {
     isLoggedIn: () => loggedIn,
-    verifyToken: async (tok) => tok === 'gueltig',
+    redeemTicket: vi.fn(async (nonce: string) => {
+      if (!nonce.startsWith('ok') || used.has(nonce)) return false
+      used.add(nonce)
+      return true
+    }),
     login: vi.fn(async (_e: string, p: string) => {
       if (p !== 'richtig') throw new Error('Anmeldung fehlgeschlagen')
       loggedIn = true
@@ -266,30 +275,49 @@ describe('Werkstatt-Server', () => {
 
   const askBody = { card: { type: 'free', payload: { question: 'q', modelAnswer: 'a', keyPoints: ['a'] }, explanation: '', source: null }, userAnswer: 'b', history: [] }
 
-  it('ask: 401 ohne Login und ohne Token, auch unkonfiguriert', async () => {
+  it('ask: 401 ohne Login und ohne gültiges Ticket, auch unkonfiguriert', async () => {
     const runClaude = vi.fn(async () => 'x')
     const { app } = setup({ runClaude })
     await request(app).post('/api/ask').send(askBody).expect(401)
-    await request(app).post('/api/ask').set('Authorization', 'Bearer falsch').send(askBody).expect(401)
+    await request(app).post('/api/ask').set('X-Ask-Ticket', ticket('no')).send(askBody).expect(401)
+    await request(app).post('/api/ask').set('X-Ask-Ticket', 'zu-kurz').send(askBody).expect(401)
     const none = setup({ gateway: null, runClaude })
-    await request(none.app).post('/api/ask').send(askBody).expect(401)
+    await request(none.app).post('/api/ask').set('X-Ask-Ticket', ticket()).send(askBody).expect(401)
     expect(runClaude).not.toHaveBeenCalled()
   })
 
-  it('ask: 200 mit gültigem Bearer-Token oder Werkstatt-Login, Claude läuft im leeren Ordner', async () => {
+  it('ask: Bearer-Token wird nicht mehr akzeptiert', async () => {
+    const runClaude = vi.fn(async () => 'x')
+    const { app } = setup({ runClaude })
+    await request(app).post('/api/ask').set('Authorization', 'Bearer gueltig').send(askBody).expect(401)
+    expect(runClaude).not.toHaveBeenCalled()
+  })
+
+  it('ask: 200 mit gültigem Einmal-Ticket oder Werkstatt-Login, Claude läuft im leeren Ordner', async () => {
     const runClaude = vi.fn(async () => 'Weil Chlorophyll …')
     const { app, deps } = setup({ runClaude })
-    const r = await request(app).post('/api/ask').set('Authorization', 'Bearer gueltig').send(askBody).expect(200)
+    const t = ticket()
+    const r = await request(app).post('/api/ask').set('X-Ask-Ticket', t).send(askBody).expect(200)
     expect(r.body).toEqual({ answer: 'Weil Chlorophyll …' })
     expect(runClaude).toHaveBeenCalledWith(expect.any(String), { addDir: join(deps.uploadDir!, 'ask-empty') })
+    // Dasselbe Ticket ein zweites Mal: abgelehnt.
+    await request(app).post('/api/ask').set('X-Ask-Ticket', t).send(askBody).expect(401)
     await login(app)
     await request(app).post('/api/ask').send(askBody).expect(200)
+  })
+
+  it('ask: Ticketprüfung schlägt fehl → 401', async () => {
+    const runClaude = vi.fn(async () => 'x')
+    const { app, gateway } = setup({ runClaude })
+    vi.mocked(gateway.redeemTicket).mockRejectedValueOnce(new Error('offline'))
+    await request(app).post('/api/ask').set('X-Ask-Ticket', ticket()).send(askBody).expect(401)
+    expect(runClaude).not.toHaveBeenCalled()
   })
 
   it('ask: begrenzt Eingaben', async () => {
     const runClaude = vi.fn(async () => 'x')
     const { app } = setup({ runClaude })
-    const post = (b: object) => request(app).post('/api/ask').set('Authorization', 'Bearer gueltig').send(b)
+    const post = (b: object) => request(app).post('/api/ask').set('X-Ask-Ticket', ticket()).send(b)
     await post({ ...askBody, userAnswer: 'a'.repeat(2001) }).expect(413)
     await post({ ...askBody, history: Array.from({ length: 21 }, () => ({ role: 'user', text: 'x' })) }).expect(413)
     await post({ ...askBody, history: [{ role: 'user', text: 'x'.repeat(4001) }] }).expect(413)
@@ -355,11 +383,11 @@ describe('Sitzungscookie der Werkstatt', () => {
     await request(app, good).get('/api/modules').expect(200)
   })
 
-  it('Bearer-Token der App funktioniert weiterhin ohne Cookie', async () => {
+  it('Einmal-Ticket der App funktioniert ohne Cookie', async () => {
     const runClaude = vi.fn(async () => 'x')
     const { app } = setup({ runClaude })
     await login(app)
-    await request(app, null).post('/api/ask').set('Authorization', 'Bearer gueltig').send(askBodyForCookies).expect(200)
+    await request(app, null).post('/api/ask').set('X-Ask-Ticket', ticket()).send(askBodyForCookies).expect(200)
   })
 })
 

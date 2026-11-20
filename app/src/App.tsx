@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js'
+import { createAskTicket } from './ask/askTicket'
 import { clearSignedInMarker, ensureOwner, saveSignedInMarker, staysSignedInOffline } from './data/account'
 import { resolveSupabaseConfig, type SupabaseConfig } from './data/config'
 import { createSupabaseRemote } from './data/remote'
@@ -139,7 +140,7 @@ export function App({ env = defaultEnv, makeClient = createAppClient, confirm = 
     }
   }, [signedIn, runSync])
 
-  const getToken = useCallback(async () => (await client?.auth.getSession())?.data.session?.access_token ?? null, [client])
+  const getTicket = useCallback(async () => (client ? createAskTicket(client) : null), [client])
 
   const authenticate = async (mode: AuthMode, email: string, password: string): Promise<string | void> => {
     if (!client) return
@@ -205,7 +206,7 @@ export function App({ env = defaultEnv, makeClient = createAppClient, confirm = 
         <StudyScreen
           moduleId={view.moduleId}
           onFinished={() => void runSync()}
-          renderAsk={(card, answer, close) => <AskDialog key={card.id} card={card} answer={answer} getToken={getToken} onClose={close} />}
+          renderAsk={(card, answer, close) => <AskDialog key={card.id} card={card} answer={answer} getTicket={getTicket} onClose={close} />}
           onExit={() => {
             setRefreshKey((k) => k + 1)
             setView({ name: 'home' })

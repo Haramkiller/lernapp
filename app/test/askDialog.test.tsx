@@ -8,7 +8,7 @@ import { AskDialog } from '../src/ui/AskDialog'
 import { choiceCard } from './ui/fixtures'
 
 const card = choiceCard('c1')
-const getToken = async () => 'tok'
+const getTicket = async () => 'ticket'
 const answer = { kind: 'choice', index: 0 } as const
 
 afterEach(() => {
@@ -27,7 +27,7 @@ describe('AskDialog Zwischenablage-Modus', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
     vi.stubGlobal('navigator', { clipboard: { writeText } })
     vi.stubGlobal('open', open)
-    render(<AskDialog card={card} answer={answer} getToken={getToken} onClose={vi.fn()} />)
+    render(<AskDialog card={card} answer={answer} getTicket={getTicket} onClose={vi.fn()} />)
     await userEvent.click(await screen.findByRole('button', { name: 'Text kopieren' }))
     expect(await screen.findByText('Text kopiert – in Claude einfügen')).toBeInTheDocument()
     expect(writeText.mock.calls[0]![0]).toContain('Falsch A')
@@ -38,7 +38,7 @@ describe('AskDialog Zwischenablage-Modus', () => {
   it('zeigt den Text zum Markieren, wenn die Zwischenablage nicht geht', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
     vi.stubGlobal('navigator', {})
-    render(<AskDialog card={card} answer={answer} getToken={getToken} onClose={vi.fn()} />)
+    render(<AskDialog card={card} answer={answer} getTicket={getTicket} onClose={vi.fn()} />)
     await userEvent.click(await screen.findByRole('button', { name: 'Text kopieren' }))
     const area = (await screen.findByLabelText('Text zum Kopieren')) as HTMLTextAreaElement
     expect(area).toHaveAttribute('readonly')
@@ -51,7 +51,7 @@ describe('AskDialog Werkstatt-Modus', () => {
   it('Frage senden, Antwort erscheint, Verlauf wächst', async () => {
     const fetchMock = werkstattFetch(() => res(200, { answer: 'Weil B stimmt.' }))
     vi.stubGlobal('fetch', fetchMock)
-    render(<AskDialog card={card} answer={answer} getToken={getToken} onClose={vi.fn()} />)
+    render(<AskDialog card={card} answer={answer} getTicket={getTicket} onClose={vi.fn()} />)
     await userEvent.click(await screen.findByRole('button', { name: 'Erklärung anfordern' }))
     expect(await screen.findByText(/Weil B stimmt\./)).toBeInTheDocument()
     await userEvent.type(screen.getByLabelText('Deine Nachfrage'), 'Und warum nicht A?')
@@ -68,7 +68,7 @@ describe('AskDialog Werkstatt-Modus', () => {
 
   it('4xx zeigt den Fehler, kein Fallback', async () => {
     vi.stubGlobal('fetch', werkstattFetch(() => res(401, { error: 'Ungültige oder abgelaufene Sitzung.' })))
-    render(<AskDialog card={card} answer={answer} getToken={getToken} onClose={vi.fn()} />)
+    render(<AskDialog card={card} answer={answer} getTicket={getTicket} onClose={vi.fn()} />)
     await userEvent.click(await screen.findByRole('button', { name: 'Erklärung anfordern' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Ungültige oder abgelaufene Sitzung.')
     expect(screen.queryByRole('button', { name: 'Text kopieren' })).not.toBeInTheDocument()
@@ -76,14 +76,14 @@ describe('AskDialog Werkstatt-Modus', () => {
 
   it('Netzwerkfehler -> Zwischenablage-Ansicht', async () => {
     vi.stubGlobal('fetch', vi.fn((url: string) => (url.endsWith('/api/health') ? Promise.resolve({ ok: true }) : Promise.reject(new TypeError('x')))))
-    render(<AskDialog card={card} answer={answer} getToken={getToken} onClose={vi.fn()} />)
+    render(<AskDialog card={card} answer={answer} getTicket={getTicket} onClose={vi.fn()} />)
     await userEvent.click(await screen.findByRole('button', { name: 'Erklärung anfordern' }))
     expect(await screen.findByRole('button', { name: 'Text kopieren' })).toBeInTheDocument()
   })
 
   it('5xx -> Zwischenablage-Ansicht mit Werkstatt-Fehler', async () => {
     vi.stubGlobal('fetch', werkstattFetch(() => res(500, { error: 'Claude nicht erreichbar.' })))
-    render(<AskDialog card={card} answer={answer} getToken={getToken} onClose={vi.fn()} />)
+    render(<AskDialog card={card} answer={answer} getTicket={getTicket} onClose={vi.fn()} />)
     await userEvent.click(await screen.findByRole('button', { name: 'Erklärung anfordern' }))
     expect(await screen.findByText('Werkstatt-Fehler: Claude nicht erreichbar.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Text kopieren' })).toBeInTheDocument()

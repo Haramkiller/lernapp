@@ -24,12 +24,16 @@ export class WerkstattError extends Error {
   }
 }
 
-export async function askWerkstatt(card: Card, userAnswer: string, history: HistoryEntry[], token: string): Promise<string> {
+/**
+ * Fragt die Werkstatt am PC. Statt des Supabase-Zugriffstokens geht nur ein Einmal-Ticket mit
+ * (siehe askTicket.ts): Ein Programm, das sich als Werkstatt ausgibt, erhält so keinen Datenzugriff.
+ */
+export async function askWerkstatt(card: Card, userAnswer: string, history: HistoryEntry[], ticket: string): Promise<string> {
   let res: Response
   try {
     res = await fetch(`${WERKSTATT_URL}/api/ask`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json', 'X-Ask-Ticket': ticket },
       body: JSON.stringify({ card, userAnswer: userAnswer.slice(0, MAX_ANSWER), history: trimHistory(history) }),
     })
   } catch {

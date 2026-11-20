@@ -140,3 +140,60 @@ begin
   end loop;
 end
 $$;
+
+-- Einmal-Tickets für „Nachfragen“ über die Werkstatt am PC.
+-- Die App schickt der Werkstatt nicht mehr ihr Zugriffstoken (das gälte für die ganze API),
+-- sondern nur eine Zufallszahl (nonce), die sie vorher als Ticket angelegt hat. Die Werkstatt löst
+-- sie über redeem_ask_ticket ein: gültig nur einmal und nur 60 Sekunden. Ein fremdes Programm,
+-- das sich als Werkstatt ausgibt, bekommt so nichts, womit es auf Daten zugreifen könnte.
+create table if not exists public.ask_tickets (
+  nonce text primary key check (nonce ~ '^[A-Za-z0-9_-]{43}$'),
+  user_id uuid not null default auth.uid() references auth.users on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists ask_tickets_created_at on public.ask_tickets (created_at);
+
+-- Den Zeitpunkt setzt immer die Datenbank, nie der Client (sonst ließen sich langlebige Tickets anlegen).
+create or replace function public.ask_tickets_set_created_at()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  new.created_at := now();
+  return new;
+end
+$$;
+
+drop trigger if exists ask_tickets_created_at on public.ask_tickets;
+create trigger ask_tickets_created_at before insert on public.ask_tickets
+  for each row execute function public.ask_tickets_set_created_at();
+
+alter table public.ask_tickets enable row level security;
+drop policy if exists ask_tickets_insert_own on public.ask_tickets;
+create policy ask_tickets_insert_own on public.ask_tickets
+  for insert to authenticated with check ((select auth.uid()) = user_id);
+-- Keine select/update/delete-Policies: Tickets liest und löscht nur redeem_ask_ticket.
+
+create or replace function public.redeem_ask_ticket(p_nonce text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  found_one boolean;
+begin
+  -- Aufräumen: alte, nie eingelöste Tickets.
+  delete from public.ask_tickets where created_at < now() - interval '1 hour';
+  delete from public.ask_tickets
+    where nonce = p_nonce
+      and created_at > now() - interval '60 seconds'
+    returning true into found_one;
+  return coalesce(found_one, false);
+end
+$$;
+
+revoke all on function public.redeem_ask_ticket(text) from public;
+grant execute on function public.redeem_ask_ticket(text) to anon, authenticated;

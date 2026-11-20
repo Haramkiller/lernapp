@@ -11,12 +11,12 @@ const FIRST_QUESTION = 'Erkläre mir genauer, warum meine Antwort falsch ist und
 type Props = {
   card: Card
   answer: Answer
-  /** Liefert das Supabase-Zugriffstoken der App-Sitzung. */
-  getToken: () => Promise<string | null>
+  /** Legt ein Einmal-Ticket für die Werkstatt an (null = nicht angemeldet). */
+  getTicket: () => Promise<string | null>
   onClose: () => void
 }
 
-export function AskDialog({ card, answer, getToken, onClose }: Props) {
+export function AskDialog({ card, answer, getTicket, onClose }: Props) {
   const [mode, setMode] = useState<AskMode | null>(null)
   const [werkstattError, setWerkstattError] = useState<string | null>(null)
   const userAnswer = describeAnswer(card, answer)
@@ -44,7 +44,7 @@ export function AskDialog({ card, answer, getToken, onClose }: Props) {
         <Chat
           card={card}
           userAnswer={userAnswer}
-          getToken={getToken}
+          getTicket={getTicket}
           onFallback={(reason) => {
             invalidateAskMode()
             setWerkstattError(reason ?? null)
@@ -102,12 +102,12 @@ function ClipboardAsk({ text, werkstattError }: { text: string; werkstattError: 
 type ChatProps = {
   card: Card
   userAnswer: string
-  getToken: () => Promise<string | null>
+  getTicket: () => Promise<string | null>
   /** Werkstatt nicht erreichbar: für diese Nachfrage auf Zwischenablage umschalten. */
   onFallback: (reason?: string) => void
 }
 
-function Chat({ card, userAnswer, getToken, onFallback }: ChatProps) {
+function Chat({ card, userAnswer, getTicket, onFallback }: ChatProps) {
   const [history, setHistory] = useState<HistoryEntry[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -121,10 +121,10 @@ function Chat({ card, userAnswer, getToken, onFallback }: ChatProps) {
     setBusy(true)
     setError(null)
     try {
-      const token = await getToken()
-      if (!token) throw new WerkstattError('Du bist nicht angemeldet.', false)
+      const ticket = await getTicket()
+      if (!ticket) throw new WerkstattError('Du bist nicht angemeldet.', false)
       // Die neue Frage steht als letzter Eintrag im Verlauf.
-      const reply = await askWerkstatt(card, userAnswer, next, token)
+      const reply = await askWerkstatt(card, userAnswer, next, ticket)
       setHistory([...next, { role: 'assistant', text: reply }])
     } catch (e) {
       if (e instanceof WerkstattError && e.unreachable) {

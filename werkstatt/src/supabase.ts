@@ -18,8 +18,8 @@ import {
 export interface Gateway {
   isLoggedIn(): boolean
   login(email: string, password: string): Promise<void>
-  /** Prüft ein Supabase-Zugriffstoken (z. B. die App-Sitzung) beim Auth-Server. */
-  verifyToken(token: string): Promise<boolean>
+  /** Löst ein Einmal-Ticket der App ein (redeem_ask_ticket): true nur beim ersten Mal und innerhalb von 60 s. */
+  redeemTicket(nonce: string): Promise<boolean>
   listModules(): Promise<Module[]>
   listTopics(moduleId: string): Promise<Topic[]>
   listCards(moduleId: string): Promise<Card[]>
@@ -55,9 +55,10 @@ export function createSupabaseGateway(cfg: SupabaseConfig): Gateway {
       if (error) throw new Error('Anmeldung fehlgeschlagen: E-Mail oder Passwort stimmen nicht (oder keine Verbindung).')
       loggedIn = true
     },
-    async verifyToken(token) {
-      const { data, error } = await client.auth.getUser(token)
-      return !error && !!data.user
+    async redeemTicket(nonce) {
+      const { data, error } = await client.rpc('redeem_ask_ticket', { p_nonce: nonce })
+      if (error) throw new Error(`Supabase: Ticket prüfen fehlgeschlagen (${error.message}).`)
+      return data === true
     },
     async listModules() {
       const { data, error } = await authed().from('modules').select('*').order('name')

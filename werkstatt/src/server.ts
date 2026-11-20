@@ -404,14 +404,18 @@ export function createServer(deps: ServerDeps) {
 
   // --- Nachfragen am PC --------------------------------------------------------------------------
 
+  // Die App schickt kein Zugriffstoken mehr, sondern ein Einmal-Ticket (siehe ask_tickets in schema.sql):
+  // Wer sich als Werkstatt ausgibt, erhält so nichts, womit er auf Daten zugreifen könnte.
   const askAuth = (req: Request, res: Response, next: NextFunction) => {
     const g = deps.gateway
     if (hasSession(req)) return next()
-    const m = /^Bearer (.+)$/.exec(req.headers.authorization ?? '')
-    if (!g || !m) return void res.status(401).json({ error: 'Nicht angemeldet (Werkstatt-Login oder App-Sitzung nötig).' })
-    g.verifyToken(m[1]!).then(
-      (ok) => (ok ? next() : void res.status(401).json({ error: 'Ungültige oder abgelaufene Sitzung.' })),
-      () => void res.status(401).json({ error: 'Sitzung konnte nicht geprüft werden.' }),
+    const nonce = req.headers['x-ask-ticket']
+    if (!g || typeof nonce !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(nonce)) {
+      return void res.status(401).json({ error: 'Nicht angemeldet (Werkstatt-Login oder Ticket der App nötig).' })
+    }
+    g.redeemTicket(nonce).then(
+      (ok) => (ok ? next() : void res.status(401).json({ error: 'Ungültiges oder abgelaufenes Ticket.' })),
+      () => void res.status(401).json({ error: 'Ticket konnte nicht geprüft werden.' }),
     )
   }
 

@@ -98,6 +98,8 @@ Wer die Werkstatt nutzen will, braucht zusätzlich Abschnitt 3 auf dem eigenen P
 
 **Die App erreicht die Werkstatt nicht (CORS-Fehler):** Prüfe `APP_ORIGIN` in `werkstatt\.env` (nur `https://<github-name>.github.io`, ohne Pfad) und starte `start.cmd` neu.
 
+**Nachfragen meldet „Ticket für die Werkstatt konnte nicht angelegt werden…“:** Beim Nachfragen über die Werkstatt schickt die App kein Zugriffstoken, sondern ein Einmal-Ticket, das nur einmal und nur 60 Sekunden gilt. Dafür braucht Supabase die Tabelle `ask_tickets` aus `schema.sql`. Wurde `schema.sql` vor diesem Update ausgeführt, die Datei einfach noch einmal **vollständig** im SQL Editor ausführen (das ist gefahrlos, bestehende Daten bleiben erhalten).
+
 **App bleibt „offline“:** Prüfe die Internetverbindung. Wenn sie in Ordnung ist, liegt es meist am pausierten Supabase-Projekt (Hinweis in Abschnitt 1): im Supabase-Dashboard **Restore project** wählen. Wirkt die App veraltet, sie komplett schließen und neu öffnen (ggf. zweimal), damit die neue Version geladen wird.
 
 **Sync-Warnungen:** Meist vorübergehend. Deine Antworten bleiben auf dem Gerät gespeichert und werden beim nächsten erfolgreichen Abgleich übertragen. Bleibt die Warnung, abmelden und wieder anmelden und prüfen, ob `schema.sql` vollständig ausgeführt wurde (Abschnitt 1, Schritt 4).
