@@ -170,6 +170,37 @@ describe('App: Kontowechsel', () => {
   })
 })
 
+describe('App: keine Sitzung aus der URL (Login-CSRF)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    window.history.replaceState(null, '', '/')
+  })
+
+  it('der echte Standard-Client übernimmt keine fremde Sitzung aus dem URL-Fragment', async () => {
+    // Link eines Angreifers mit dessen Tokens; auth-js prüft sie per /auth/v1/user und würde sie übernehmen
+    window.history.replaceState(null, '', '/#access_token=AT&refresh_token=RT&expires_in=3600&token_type=bearer')
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = input instanceof Request ? input.url : String(input)
+      if (url.includes('/auth/v1/user')) {
+        return new Response(JSON.stringify({ id: 'attacker', aud: 'authenticated', role: 'authenticated', email: 'a@b.de' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      throw new TypeError('Failed to fetch')
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<App env={env} />) // ohne makeClient: der Client, den die App wirklich baut
+    expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+    await act(async () => {})
+    await new Promise((r) => setTimeout(r, 50))
+    expect(screen.getByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+    expect(fetchMock.mock.calls.some(([input]) => String(input instanceof Request ? input.url : input).includes('/auth/v1/user'))).toBe(false)
+    expect(await db.meta.get('owner')).toBeUndefined()
+  })
+})
+
 describe('App: eigene Datenbank vor der Anmeldung', () => {
   it('Link auf der Anmeldeseite öffnet die Einrichtung; Speichern verbindet neu; Zurück möglich', async () => {
     const made: string[] = []

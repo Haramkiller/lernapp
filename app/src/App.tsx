@@ -17,6 +17,10 @@ type View = { name: 'home' } | { name: 'study'; moduleId?: string } | { name: 's
 
 const defaultEnv = { url: import.meta.env.VITE_SUPABASE_URL as string | undefined, key: import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined }
 
+// Keine Sitzung aus der URL übernehmen: Sonst meldet ein Link mit fremden Tokens im Fragment (#access_token=…)
+// unbemerkt im Konto des Absenders an (Login-CSRF). Die App meldet nur per Passwort an.
+const createAppClient = (url: string, key: string) => createClient(url, key, { auth: { detectSessionInUrl: false } })
+
 type Props = {
   /** Eingebaute Datenbank (Build-Variablen); für Tests austauschbar. */
   env?: { url?: string; key?: string }
@@ -25,7 +29,7 @@ type Props = {
   confirm?: (message: string) => boolean
 }
 
-export function App({ env = defaultEnv, makeClient = createClient, confirm = (m) => window.confirm(m) }: Props = {}) {
+export function App({ env = defaultEnv, makeClient = createAppClient, confirm = (m) => window.confirm(m) }: Props = {}) {
   // undefined = wird geladen
   const [config, setConfig] = useState<SupabaseConfig | null | undefined>(undefined)
   const [override, setOverride] = useState<SupabaseConfig | null>(null)
