@@ -1,7 +1,21 @@
 import type { Module } from '@lernapp/shared'
 
 export type BossAnim = 'idle' | 'attack' | 'hit'
-export type BossDef = { id: string; title: string; frames: Record<BossAnim, number>; fps: number }
+export type RegionId = 'wald' | 'sumpf' | 'kristallberge' | 'kueste' | 'arena' | 'vulkan'
+export type RegionDef = { id: RegionId; name: string }
+export type BossDef = { id: string; title: string; region: RegionId; frames: Record<BossAnim, number>; fps: number }
+/** Gewähltes Gebiet je Modul: moduleId → bossId. */
+export type AreaChoices = Map<string, string>
+
+/** Reihenfolge = Reihenfolge auf der Karte. Jede Region ist die Heimat genau eines Bosses. */
+export const REGIONS: RegionDef[] = [
+  { id: 'wald', name: 'Wald' },
+  { id: 'sumpf', name: 'Sumpf' },
+  { id: 'kristallberge', name: 'Kristallberge' },
+  { id: 'kueste', name: 'Küste' },
+  { id: 'arena', name: 'Arena' },
+  { id: 'vulkan', name: 'Vulkan' },
+]
 export type FxName = 'hit' | 'combo2' | 'combo3' | 'crit' | 'claw'
 
 // PixelLab v3: je Animation das Ausgangsbild plus 4 bzw. 6 bewegte Bilder.
@@ -9,12 +23,12 @@ const DEFAULT_FRAMES: Record<BossAnim, number> = { idle: 5, attack: 7, hit: 5 }
 
 /** Erster Vorrat. Bildzahlen entsprechen den Dateien unter public/game/bosses/<id>/. */
 export const BOSSES: BossDef[] = [
-  { id: 'moosgolem', title: 'Moosgolem', frames: DEFAULT_FRAMES, fps: 8 },
-  { id: 'sporenhexe', title: 'Sporenhexe', frames: DEFAULT_FRAMES, fps: 8 },
-  { id: 'kristallwaechter', title: 'Kristallwächter', frames: DEFAULT_FRAMES, fps: 8 },
-  { id: 'tiefseekraken', title: 'Tiefseekraken', frames: DEFAULT_FRAMES, fps: 8 },
-  { id: 'bronzetitan', title: 'Bronzetitan', frames: DEFAULT_FRAMES, fps: 8 },
-  { id: 'aschephoenix', title: 'Aschephönix', frames: DEFAULT_FRAMES, fps: 8 },
+  { id: 'moosgolem', title: 'Moosgolem', region: 'wald', frames: DEFAULT_FRAMES, fps: 8 },
+  { id: 'sporenhexe', title: 'Sporenhexe', region: 'sumpf', frames: DEFAULT_FRAMES, fps: 8 },
+  { id: 'kristallwaechter', title: 'Kristallwächter', region: 'kristallberge', frames: DEFAULT_FRAMES, fps: 8 },
+  { id: 'tiefseekraken', title: 'Tiefseekraken', region: 'kueste', frames: DEFAULT_FRAMES, fps: 8 },
+  { id: 'bronzetitan', title: 'Bronzetitan', region: 'arena', frames: DEFAULT_FRAMES, fps: 8 },
+  { id: 'aschephoenix', title: 'Aschephönix', region: 'vulkan', frames: DEFAULT_FRAMES, fps: 8 },
 ]
 
 export const FX: Record<FxName, { frames: number; fps: number }> = {
@@ -55,15 +69,28 @@ function hash(s: string): number {
   return h
 }
 
+export function regionOf(boss: BossDef): RegionDef {
+  return REGIONS.find((r) => r.id === boss.region)!
+}
+
 /**
- * Feste Zuordnung Modul → Boss: Wunschplatz aus dem Hash der ID, bei Belegung der nächste freie.
- * Unabhängig von der Reihenfolge der Eingabe. (Teil 2 speichert die Wahl dauerhaft.)
+ * Zuordnung Modul → Boss: gültige Wahl zuerst, sonst Wunschplatz aus dem Hash der ID, bei Belegung
+ * der nächste freie. Unabhängig von der Reihenfolge der Eingabe.
  */
-export function assignBosses(modules: Pick<Module, 'id'>[]): Map<string, BossDef> {
+export function assignBosses(modules: Pick<Module, 'id'>[], chosen: AreaChoices = new Map()): Map<string, BossDef> {
   const n = BOSSES.length
   const result = new Map<string, BossDef>()
   let taken = new Set<number>()
-  for (const { id } of [...modules].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
+  const rest: Pick<Module, 'id'>[] = []
+  for (const m of modules) {
+    const slot = BOSSES.findIndex((b) => b.id === chosen.get(m.id))
+    if (slot === -1) rest.push(m)
+    else {
+      taken.add(slot)
+      result.set(m.id, BOSSES[slot]!)
+    }
+  }
+  for (const { id } of rest.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
     if (taken.size === n) taken = new Set()
     let slot = hash(id) % n
     while (taken.has(slot)) slot = (slot + 1) % n
@@ -73,8 +100,12 @@ export function assignBosses(modules: Pick<Module, 'id'>[]): Map<string, BossDef
   return result
 }
 
-export function bossFor(moduleId: string | undefined, modules: Pick<Module, 'id' | 'name'>[]): { boss: BossDef; name: string } {
+export function bossFor(
+  moduleId: string | undefined,
+  modules: Pick<Module, 'id' | 'name'>[],
+  chosen?: AreaChoices,
+): { boss: BossDef; name: string } {
   const module = modules.find((m) => m.id === moduleId)
-  const boss = (module && assignBosses(modules).get(module.id)) ?? BOSSES[0]!
+  const boss = (module && assignBosses(modules, chosen).get(module.id)) ?? BOSSES[0]!
   return { boss, name: `${boss.title} · ${module?.name ?? UNKNOWN_AREA}` }
 }

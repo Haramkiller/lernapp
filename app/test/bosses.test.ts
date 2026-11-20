@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { BOSSES, FX, assignBosses, bossBackdrop, bossFor, bossFrames, fxFrames } from '../src/game/bosses'
+import { BOSSES, FX, REGIONS, assignBosses, bossBackdrop, bossFor, bossFrames, fxFrames, regionOf } from '../src/game/bosses'
 
 const pub = join(__dirname, '../public')
 const file = (url: string) => join(pub, url.replace(/^\//, ''))
@@ -22,6 +22,33 @@ describe('bosses', () => {
 
   it('mehr Module als Bosse: jedes Modul hat trotzdem einen', () => {
     expect(assignBosses(mods(9)).size).toBe(9)
+  })
+
+  it('6 Regionen, jede mit genau einem Boss', () => {
+    expect(REGIONS.map((r) => r.name)).toEqual(['Wald', 'Sumpf', 'Kristallberge', 'Küste', 'Arena', 'Vulkan'])
+    for (const r of REGIONS) expect(BOSSES.filter((b) => b.region === r.id)).toHaveLength(1)
+    expect(regionOf(BOSSES.find((b) => b.id === 'aschephoenix')!).name).toBe('Vulkan')
+  })
+
+  it('gewählter Boss gewinnt, die anderen meiden ihn', () => {
+    const m = assignBosses(mods(3), new Map([['mod-0', 'aschephoenix']]))
+    expect(m.get('mod-0')!.id).toBe('aschephoenix')
+    expect(m.get('mod-1')!.id).not.toBe('aschephoenix')
+    expect(m.get('mod-2')!.id).not.toBe('aschephoenix')
+  })
+
+  it('zwei Module wählen denselben Boss: beide bekommen ihn', () => {
+    const m = assignBosses(mods(2), new Map([['mod-0', 'sporenhexe'], ['mod-1', 'sporenhexe']]))
+    expect(m.get('mod-0')!.id).toBe('sporenhexe')
+    expect(m.get('mod-1')!.id).toBe('sporenhexe')
+  })
+
+  it('unbekannte Boss-ID oder fremdes Modul in der Wahl: wie ohne Wahl', () => {
+    const plain = assignBosses(mods(3))
+    const odd = assignBosses(mods(3), new Map([['mod-0', 'gibtsnicht'], ['weg', 'moosgolem']]))
+    for (const id of plain.keys()) expect(odd.get(id)!.id).toBe(plain.get(id)!.id)
+    const other = BOSSES.find((b) => b.id !== plain.get('mod-1')!.id)!
+    expect(bossFor('mod-1', mods(3), new Map([['mod-1', other.id]])).boss.id).toBe(other.id)
   })
 
   it('Name aus Boss-Titel und Modulname', () => {
