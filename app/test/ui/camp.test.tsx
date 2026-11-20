@@ -115,6 +115,18 @@ describe('CampScreen', () => {
     expect(onBattle).toHaveBeenCalledWith(undefined, true)
   })
 
+  it('offene Karte sperrt den Waldplatz dahinter (inert), nach dem Schließen wieder frei', async () => {
+    await botanik()
+    camp()
+    await openMap()
+    await screen.findByRole('dialog', { name: 'Karte' })
+    const menu = screen.getByRole('button', { name: 'Menü', hidden: true })
+    expect(menu.closest('[inert]')).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'Schließen' }).closest('[inert]')).toBeNull()
+    await userEvent.keyboard('{Escape}')
+    expect(menu.closest('[inert]')).toBeNull()
+  })
+
   it('Escape und „Schließen“ schließen die Karte, der Fokus kehrt zum Feuer zurück', async () => {
     await botanik()
     camp()

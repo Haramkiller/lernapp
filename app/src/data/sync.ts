@@ -186,5 +186,6 @@ export async function sync(
 
   const result: { pushed: number; pulled: number; pushError?: string } = { pushed: push.pushed, pulled }
   if (push.error) result.pushError = push.error instanceof Error ? push.error.message : String(push.error)
+  else if (incoming.gameError) result.pushError = incoming.gameError
   return result
 }

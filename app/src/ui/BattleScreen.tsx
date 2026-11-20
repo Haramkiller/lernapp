@@ -4,7 +4,8 @@ import { db } from '../data/db'
 import { loadSettings } from '../data/settings'
 import { recordReview } from '../data/sync'
 import { LUCKY_CHANCE, RESTED_LUCKY_CHANCE, applyAnswer, endBattle, hpPercent, startBattle, type Battle } from '../game/battle'
-import { bossFor } from '../game/bosses'
+import { bossFor, type AreaChoices } from '../game/bosses'
+import { loadAreaChoices } from '../data/game'
 import { buildQueue, newDoneKey, type Settings } from '../session/queue'
 import { toRating, type Outcome } from '../srs/grading'
 import { newSrsState, review, type SrsState } from '../srs/scheduler'
@@ -61,6 +62,7 @@ export function BattleScreen({
 }: Props) {
   const [cards, setCards] = useState<Card[] | null>(null)
   const [modules, setModules] = useState<Module[]>([])
+  const [areas, setAreas] = useState<AreaChoices>(new Map())
   const [index, setIndex] = useState(0)
   const [result, setResult] = useState<{ outcome: Outcome; answer: Answer } | null>(null)
   const [counts, setCounts] = useState<Counts>({ right: 0, partial: 0, wrong: 0 })
@@ -83,7 +85,13 @@ export function BattleScreen({
     setCards(null)
     void (async () => {
       try {
-        const [all, rows, s, mods] = await Promise.all([db.cards.toArray(), db.states.toArray(), loadSettings(), db.modules.toArray()])
+        const [all, rows, s, mods, chosen] = await Promise.all([
+          db.cards.toArray(),
+          db.states.toArray(),
+          loadSettings(),
+          db.modules.toArray(),
+          loadAreaChoices(),
+        ])
         const t = now()
         const map = new Map(rows.map((r) => [r.cardId, r.state]))
         const newDoneToday = ((await db.meta.get(newDoneKey(t)))?.value as number | undefined) ?? 0
@@ -94,6 +102,7 @@ export function BattleScreen({
         if (cancelled) return
         settings.current = s
         setModules(mods)
+        setAreas(chosen)
         setSkippedInvalid(inScope.length - valid.length)
         setCards(ids.map((id) => byId.get(id)!))
         setBattle(startBattle(ids.length))
@@ -147,7 +156,7 @@ export function BattleScreen({
     )
   }
 
-  const { boss, name } = bossFor(moduleId, modules)
+  const { boss, name } = bossFor(moduleId, modules, areas)
 
   if (done) {
     const final = endBattle(battle)

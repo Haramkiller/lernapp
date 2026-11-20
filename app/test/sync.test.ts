@@ -11,7 +11,7 @@ import { newDoneKey } from '../src/session/queue'
  * In-Memory-Server: bedingter Upsert (älteres updated_at wird ignoriert, wie der DB-Trigger) und ein
  * streng wachsendes synced_at (Serverzeit, 10 s Abstand), das nur bei angenommenen Schreibvorgängen vergeben wird.
  */
-function fakeRemote(opts: { fail?: boolean; failPush?: boolean; poison?: string[]; pushError?: RemoteError } = {}) {
+function fakeRemote(opts: { fail?: boolean; failPush?: boolean; poison?: string[]; pushError?: RemoteError; gameError?: string } = {}) {
   let clock = Date.parse('2026-03-10T00:00:00Z')
   type Row = { item: { updatedAt: string }; syncedAt: string }
   const tables: Record<SyncTable, Map<string, Row>> = {
@@ -45,6 +45,11 @@ function fakeRemote(opts: { fail?: boolean; failPush?: boolean; poison?: string[
           out[t].push(row.item)
           if (!cursors[t] || row.syncedAt > cursors[t]!) cursors[t] = row.syncedAt
         }
+      }
+      if (opts.gameError) {
+        out.game = []
+        delete cursors.game
+        return { ...out, cursors, gameError: opts.gameError } as unknown as Pulled
       }
       return { ...out, cursors } as unknown as Pulled
     },
@@ -312,6 +317,14 @@ describe('sync: Push-Fehler', () => {
 })
 
 describe('sync: Spieldaten', () => {
+  it('Server ohne game_items: Karten werden trotzdem übernommen, der Fehler wird gemeldet', async () => {
+    const remote = fakeRemote({ gameError: 'relation game_items does not exist' })
+    remote.put('cards', 'c1', card('c1'))
+    const res = await sync(remote, T1)
+    expect(await db.cards.get('c1')).toBeDefined()
+    expect(res.pushError).toMatch(/game_items/)
+  })
+
   const item = (id: string, at: Date, bossId: string): GameItem => ({ id, data: { bossId }, updatedAt: at.toISOString() })
 
   it('pro ID geht nur der neueste Eintrag raus, die Outbox wird leer', async () => {

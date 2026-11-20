@@ -10,11 +10,13 @@ import { seededRng } from '../../src/ui/random'
 import { choiceCard } from './fixtures'
 import { newDoneKey } from '../../src/session/queue'
 import { newSrsState, review } from '../../src/srs/scheduler'
+import { BOSSES, bossFor } from '../../src/game/bosses'
+import { saveAreaChoice } from '../../src/data/game'
 
 const NOW = new Date('2026-03-10T10:00:00.000Z')
 
 beforeEach(async () => {
-  await Promise.all([db.cards.clear(), db.states.clear(), db.outbox.clear(), db.meta.clear(), db.modules.clear(), db.topics.clear()])
+  await Promise.all([db.cards.clear(), db.states.clear(), db.outbox.clear(), db.meta.clear(), db.modules.clear(), db.topics.clear(), db.game.clear()])
 })
 
 describe('BattleScreen', () => {
@@ -115,6 +117,17 @@ describe('BattleScreen: Kampf', () => {
     render(<BattleScreen moduleId="m1" now={() => NOW} rng={NO_LUCK} onExit={vi.fn()} />)
     expect(await screen.findByRole('heading', { name: /· Botanik$/ })).toBeInTheDocument()
     expect(bar()).toHaveAttribute('aria-valuenow', '100')
+  })
+
+  it('kämpft gegen den Boss des gewählten Gebiets (wie auf der Karte)', async () => {
+    await botanik()
+    await cards(2)
+    const mod = { id: 'm1', name: 'Botanik', examDate: null, styleProfile: null, updatedAt: NOW.toISOString() }
+    const auto = bossFor('m1', [mod]).boss
+    const chosen = BOSSES.find((b) => b.id !== auto.id)!
+    await saveAreaChoice('m1', chosen.id, NOW)
+    render(<BattleScreen moduleId="m1" now={() => NOW} rng={NO_LUCK} onExit={vi.fn()} />)
+    expect(await screen.findByRole('heading', { name: `${chosen.title} · Botanik` })).toBeInTheDocument()
   })
 
   it('richtige Antwort senkt das Leben, falsche lässt den Boss angreifen', async () => {

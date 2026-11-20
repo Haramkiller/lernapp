@@ -68,6 +68,9 @@ export function CampScreen({ now = () => new Date(), sync, refreshKey = 0, onBat
   const [menuOpen, setMenuOpen] = useState(false)
   const [, setTick] = useState(0)
   const fire = useRef<HTMLButtonElement>(null)
+  /** Alles hinter der Karte; bei offener Karte `inert` (kein Tab, kein Vorlesen dahinter). */
+  const body = useRef<HTMLDivElement>(null)
+  const wasOpen = useRef(false)
 
   useEffect(() => {
     let cancelled = false
@@ -92,10 +95,21 @@ export function CampScreen({ now = () => new Date(), sync, refreshKey = 0, onBat
     return () => clearInterval(id)
   }, [])
 
-  const closeMap = useCallback(() => {
-    setMapOpen(false)
-    fire.current?.focus()
-  }, [])
+  const closeMap = useCallback(() => setMapOpen(false), [])
+
+  // React 18 kennt `inert` nicht als Prop. Erst nach dem Aufheben darf das Feuer den Fokus bekommen.
+  useEffect(() => {
+    const el = body.current
+    if (!el) return
+    if (mapOpen) {
+      el.setAttribute('inert', '')
+      wasOpen.current = true
+    } else {
+      el.removeAttribute('inert')
+      if (wasOpen.current) fire.current?.focus()
+      wasOpen.current = false
+    }
+  }, [mapOpen, data])
 
   if (data === null) {
     return (
@@ -123,50 +137,52 @@ export function CampScreen({ now = () => new Date(), sync, refreshKey = 0, onBat
 
   return (
     <section className="camp">
-      <div className="scene">
-        <img className="scene-backdrop" src={CAMP.backdrop} alt="" draggable={false} />
-        <button
-          type="button"
-          ref={fire}
-          className="campfire"
-          style={{ left: `${f.x}%`, top: `${f.y}%`, width: `${f.width}%` }}
-          aria-label="Lagerfeuer – Karte öffnen"
-          onClick={() => setMapOpen(true)}
-        >
-          <span className="fire-glow" aria-hidden="true" />
-          <Sprite frames={fireFrames()} fps={f.fps} />
-        </button>
-        <button type="button" className="scene-menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
-          Menü
-        </button>
-        <p className="scene-hint">
-          {rested ? 'Ausgeruht · tippe aufs Feuer für die Karte' : `Pause am Feuer: noch ${minutesUntilRested(data.lastBattleAt, t)} min bis Ausgeruht`}
-        </p>
-      </div>
-      {menuOpen && (
-        <div className="camp-menu card-panel">
-          <p className={`sync ${sync.kind}`}>{syncText(sync)}</p>
-          {data.dead > 0 && <p className="warn">{`${data.dead} Einträge konnten nicht synchronisiert werden`}</p>}
-          <div className="row">
-            {onSyncNow && (
-              <button type="button" onClick={onSyncNow}>
-                Jetzt synchronisieren
+      <div ref={body}>
+        <div className="scene">
+          <img className="scene-backdrop" src={CAMP.backdrop} alt="" draggable={false} />
+          <button
+            type="button"
+            ref={fire}
+            className="campfire"
+            style={{ left: `${f.x}%`, top: `${f.y}%`, width: `${f.width}%` }}
+            aria-label="Lagerfeuer – Karte öffnen"
+            onClick={() => setMapOpen(true)}
+          >
+            <span className="fire-glow" aria-hidden="true" />
+            <Sprite frames={fireFrames()} fps={f.fps} />
+          </button>
+          <button type="button" className="scene-menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
+            Menü
+          </button>
+          <p className="scene-hint">
+            {rested ? 'Ausgeruht · tippe aufs Feuer für die Karte' : `Pause am Feuer: noch ${minutesUntilRested(data.lastBattleAt, t)} min bis Ausgeruht`}
+          </p>
+        </div>
+        {menuOpen && (
+          <div className="camp-menu card-panel">
+            <p className={`sync ${sync.kind}`}>{syncText(sync)}</p>
+            {data.dead > 0 && <p className="warn">{`${data.dead} Einträge konnten nicht synchronisiert werden`}</p>}
+            <div className="row">
+              {onSyncNow && (
+                <button type="button" onClick={onSyncNow}>
+                  Jetzt synchronisieren
+                </button>
+              )}
+              <button type="button" onClick={onSettings}>
+                Einstellungen
               </button>
-            )}
-            <button type="button" onClick={onSettings}>
-              Einstellungen
+            </div>
+          </div>
+        )}
+        {data.overview.strays > 0 && (
+          <div className="row strays">
+            <span>{`Verirrte Karten: ${data.overview.strays}`}</span>
+            <button type="button" onClick={() => battle(undefined)}>
+              Kämpfen
             </button>
           </div>
-        </div>
-      )}
-      {data.overview.strays > 0 && (
-        <div className="row strays">
-          <span>{`Verirrte Karten: ${data.overview.strays}`}</span>
-          <button type="button" onClick={() => battle(undefined)}>
-            Kämpfen
-          </button>
-        </div>
-      )}
+        )}
+      </div>
       {mapOpen && <MapDialog overview={data.overview} onBattle={battle} onClose={closeMap} />}
     </section>
   )

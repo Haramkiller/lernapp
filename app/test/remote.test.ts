@@ -5,7 +5,7 @@ import { createSupabaseRemote, RemoteError } from '../src/data/remote'
 type Row = Record<string, unknown> & { synced_at: string }
 
 /** Minimaler PostgREST-Ersatz: gte / or-Keyset / order / limit, mit serverseitigem max_rows. */
-function stubClient(data: Record<string, Row[]>, maxRows: number, failWith?: { status: number; message: string }) {
+function stubClient(data: Record<string, Row[]>, maxRows: number, failWith?: { status: number; message: string; table?: string }) {
   const calls: { table: string; gte?: string; or?: string }[] = []
   const client = {
     from(table: string) {
@@ -20,7 +20,7 @@ function stubClient(data: Record<string, Row[]>, maxRows: number, failWith?: { s
         limit: (n: number) => ((limit = n), b),
         then(resolve: (v: unknown) => unknown) {
           calls.push(call)
-          if (failWith) return resolve({ data: null, error: { message: failWith.message }, status: failWith.status })
+          if (failWith && (!failWith.table || failWith.table === table)) return resolve({ data: null, error: { message: failWith.message }, status: failWith.status })
           let rows = [...(data[table] ?? [])].sort(
             (a, c) => a.synced_at.localeCompare(c.synced_at) || String(a[keyCol]).localeCompare(String(c[keyCol])),
           )
@@ -114,6 +114,16 @@ describe('Spieldaten (game_items)', () => {
     const res = await createSupabaseRemote(client).pullSince(since)
     expect(res.game).toEqual([{ id: 'area:m1', data: { bossId: 'sporenhexe' }, updatedAt: '2026-03-10T10:00:00.000Z' }])
     expect(res.cursors.game).toBe('2026-03-10T10:00:00.500Z')
+  })
+
+  it('fehlende Tabelle game_items (404): die übrigen Tabellen kommen trotzdem, der Fehler wird gemeldet', async () => {
+    const cards: Row[] = [{ ...base, id: 'k1', topic_id: 't', type: 'free', payload: { question: 'q', answer: 'a' }, explanation: '', source: null, exam_relevant: false, from_exam: false, difficulty: 1, deleted: false, created_at: '2026-03-10T11:00:00+01:00', synced_at: '2026-03-10T10:00:01+00:00' }]
+    const { client } = stubClient({ cards }, 10, { status: 404, message: 'relation game_items does not exist', table: 'game_items' })
+    const res = await createSupabaseRemote(client).pullSince(since)
+    expect(res.cards.map((c) => c.id)).toEqual(['k1'])
+    expect(res.game).toEqual([])
+    expect(res.cursors.game).toBeUndefined()
+    expect(res.gameError).toMatch(/game_items/)
   })
 
   it('pushGame: Upsert auf (user_id, id), ohne user_id im Datensatz', async () => {

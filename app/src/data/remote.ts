@@ -30,6 +30,8 @@ export type Pulled = {
   game: GameItem[]
   /** Höchstes gesehenes `synced_at` je Tabelle; fehlt, wenn die Tabelle keine Zeilen lieferte. */
   cursors: Partial<Cursors>
+  /** Spieldaten ließen sich nicht lesen (z. B. Tabelle fehlt, Schema nicht ausgeführt); der Rest gilt trotzdem. */
+  gameError?: string
 }
 
 export interface Remote {
@@ -120,7 +122,12 @@ export function createSupabaseRemote(client: SupabaseClient): Remote {
         fetchAll<Synced<TopicRow>>('topics', 'id', since.topics),
         fetchAll<Synced<CardRow>>('cards', 'id', since.cards),
         fetchAll<Synced<StateDbRow<SrsState>>>('card_states', 'card_id', since.states),
-        fetchAll<Synced<GameRow>>('game_items', 'id', since.game),
+        // Spieldaten sind Nebensache: ein Fehler dort darf Karten und Lernstände nicht aufhalten.
+        fetchAll<Synced<GameRow>>('game_items', 'id', since.game).catch((e: unknown) => ({
+          rows: [] as Synced<GameRow>[],
+          cursor: undefined,
+          error: e instanceof Error ? e.message : String(e),
+        })),
       ])
       const cursors: Partial<Cursors> = {}
       if (modules.cursor) cursors.modules = modules.cursor
@@ -135,6 +142,7 @@ export function createSupabaseRemote(client: SupabaseClient): Remote {
         states: states.rows.map(rowToState),
         game: game.rows.map(rowToGame),
         cursors,
+        ...('error' in game ? { gameError: game.error } : {}),
       }
     },
     pushStates: (s) => upsert('card_states', s.map(stateToRow), 'card_id'),
