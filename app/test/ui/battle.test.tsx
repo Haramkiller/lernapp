@@ -126,8 +126,9 @@ describe('BattleScreen: Kampf', () => {
     expect(container.querySelector('.fx-damage')).toHaveTextContent('-10')
     await next()
     await wrong()
+    // Die Antwort zählt erst nach dem Speichern: auf den Angriff warten, nicht sofort prüfen (CI ist langsamer).
+    await vi.waitFor(() => expect(container.querySelector('.arena')).toHaveClass('boss-attacks'))
     expect(bar()).toHaveAttribute('aria-valuenow', '75')
-    expect(container.querySelector('.arena')).toHaveClass('boss-attacks')
     expect(screen.queryByText(/Herz|Leben verloren/)).not.toBeInTheDocument()
   })
 

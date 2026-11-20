@@ -236,8 +236,9 @@ describe('App: eigene Datenbank vor der Anmeldung', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Eigene Datenbank verwenden' }))
     expect(screen.getByLabelText('Supabase-URL')).toHaveValue('https://b.supabase.co')
     await userEvent.click(screen.getByRole('button', { name: 'Eingebaute Datenbank verwenden' }))
-    expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+    // Erst auf den neuen Client warten, dann auf die Anmeldeseite (unter Last dauert der Wechsel länger als 1 s).
+    await vi.waitFor(() => expect(made.at(-1)).toBe(URL_A), { timeout: 5_000 })
+    expect(await screen.findByRole('heading', { name: 'Anmelden' }, { timeout: 5_000 })).toBeInTheDocument()
     expect(await loadOverride()).toBeNull()
-    await vi.waitFor(() => expect(made.at(-1)).toBe(URL_A))
   })
 })
