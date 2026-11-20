@@ -1,5 +1,10 @@
+import { existsSync, readdirSync, statSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { BOSSES, assignBosses, bossFor, bossFrames, fxFrames } from '../src/game/bosses'
+import { BOSSES, FX, assignBosses, bossBackdrop, bossFor, bossFrames, fxFrames } from '../src/game/bosses'
+
+const pub = join(__dirname, '../public')
+const file = (url: string) => join(pub, url.replace(/^\//, ''))
 
 const mods = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `mod-${i}`, name: `Modul ${i}` }))
 
@@ -34,5 +39,26 @@ describe('bosses', () => {
     expect(bossFrames(b, 'idle')[0]).toBe(`/game/bosses/${b.id}/idle_0.png`)
     expect(bossFrames(b, 'idle')).toHaveLength(b.frames.idle)
     expect(fxFrames('crit')[1]).toBe('/game/fx/crit_1.png')
+  })
+
+  it('alle Bilder des Vorrats liegen in public/game, keine überzähligen', () => {
+    for (const b of BOSSES) {
+      for (const anim of ['idle', 'attack', 'hit'] as const) {
+        for (const f of bossFrames(b, anim)) expect(existsSync(file(f)), f).toBe(true)
+        // Ein Bild mehr als eingetragen hieße: die Animation wird abgeschnitten.
+        expect(existsSync(file(`/game/bosses/${b.id}/${anim}_${b.frames[anim]}.png`)), `${b.id}/${anim}`).toBe(false)
+      }
+      expect(existsSync(file(bossBackdrop(b))), bossBackdrop(b)).toBe(true)
+    }
+    for (const n of Object.keys(FX) as (keyof typeof FX)[]) {
+      for (const f of fxFrames(n)) expect(existsSync(file(f)), f).toBe(true)
+      expect(existsSync(file(`/game/fx/${n}_${FX[n].frames}.png`)), n).toBe(false)
+    }
+  })
+
+  it('alle Grafiken zusammen höchstens 4 MB', () => {
+    const size = (d: string): number =>
+      readdirSync(d, { withFileTypes: true }).reduce((s, e) => s + (e.isDirectory() ? size(join(d, e.name)) : statSync(join(d, e.name)).size), 0)
+    expect(size(join(pub, 'game'))).toBeLessThanOrEqual(4 * 1024 * 1024)
   })
 })

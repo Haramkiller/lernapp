@@ -4,7 +4,8 @@ export type BossAnim = 'idle' | 'attack' | 'hit'
 export type BossDef = { id: string; title: string; frames: Record<BossAnim, number>; fps: number }
 export type FxName = 'hit' | 'combo2' | 'combo3' | 'crit' | 'claw'
 
-const DEFAULT_FRAMES: Record<BossAnim, number> = { idle: 4, attack: 6, hit: 4 }
+// PixelLab v3: je Animation das Ausgangsbild plus 4 bzw. 6 bewegte Bilder.
+const DEFAULT_FRAMES: Record<BossAnim, number> = { idle: 5, attack: 7, hit: 5 }
 
 /** Erster Vorrat. Bildzahlen entsprechen den Dateien unter public/game/bosses/<id>/. */
 export const BOSSES: BossDef[] = [
@@ -17,11 +18,11 @@ export const BOSSES: BossDef[] = [
 ]
 
 export const FX: Record<FxName, { frames: number; fps: number }> = {
-  hit: { frames: 6, fps: 12 },
-  combo2: { frames: 6, fps: 12 },
-  combo3: { frames: 6, fps: 12 },
-  crit: { frames: 6, fps: 12 },
-  claw: { frames: 6, fps: 12 },
+  hit: { frames: 8, fps: 16 },
+  combo2: { frames: 12, fps: 16 },
+  combo3: { frames: 15, fps: 16 },
+  crit: { frames: 12, fps: 16 },
+  claw: { frames: 8, fps: 16 },
 }
 
 export const UNKNOWN_AREA = 'Unbekanntes Gebiet'
