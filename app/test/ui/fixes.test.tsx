@@ -63,7 +63,7 @@ describe('fehlerhafte Karten', () => {
     render(<StudyScreen now={() => NOW} rng={seededRng(1)} onExit={vi.fn()} />)
     expect(await screen.findByRole('button', { name: /Richtig B/ })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /Richtig B/ }))
-    await userEvent.click(screen.getByRole('button', { name: 'Weiter' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Weiter' }))
     expect(await screen.findByText(/1 fehlerhafte Karte/)).toBeInTheDocument()
   })
 

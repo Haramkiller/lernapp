@@ -28,7 +28,7 @@ describe('StudyScreen', () => {
       const right = i % 5 !== 4 // 20 richtig, 5 falsch
       await userEvent.click(await screen.findByRole('button', { name: right ? /Richtig B/ : /Falsch A/ }))
       expect(await db.states.count()).toBe(i + 1)
-      await userEvent.click(screen.getByRole('button', { name: 'Weiter' }))
+      await userEvent.click(await screen.findByRole('button', { name: 'Weiter' }))
     }
     expect(await screen.findByText(/20 richtig/)).toBeInTheDocument()
     expect(screen.getByText(/5 falsch/)).toBeInTheDocument()
@@ -75,7 +75,7 @@ describe('StudyScreen', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Richtig B/ }))
     await userEvent.click(await screen.findByRole('button', { name: 'Nachfragen' }))
     expect(screen.getByText(/Dialog für c/)).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Weiter' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Weiter' }))
     expect(screen.queryByText(/Dialog für/)).not.toBeInTheDocument()
     await userEvent.click(await screen.findByRole('button', { name: /Richtig B/ }))
     await userEvent.click(await screen.findByRole('button', { name: 'Nachfragen' }))

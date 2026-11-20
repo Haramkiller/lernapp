@@ -218,9 +218,10 @@ describe('App: eigene Datenbank vor der Anmeldung', () => {
     await userEvent.type(screen.getByLabelText('Supabase-URL'), 'https://b.supabase.co')
     await userEvent.type(screen.getByLabelText('Öffentlicher Schlüssel'), 'anon-b')
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+    // Erst auf den neuen Client warten: Vorher zeigt die App kurz noch die alte Anmeldeseite bzw. „Lade …“.
+    await vi.waitFor(() => expect(made.at(-1)).toBe('https://b.supabase.co'))
     expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
     expect(await loadOverride()).toEqual({ url: 'https://b.supabase.co', key: 'anon-b' })
-    await vi.waitFor(() => expect(made.at(-1)).toBe('https://b.supabase.co'))
   }, 15_000) // tippt viele Zeichen einzeln; unter Last (CI) reichen die 5 s Standard nicht
 
   it('mit eigener Datenbank: zurück zur eingebauten', async () => {
