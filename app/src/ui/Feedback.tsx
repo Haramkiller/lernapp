@@ -17,6 +17,23 @@ export type FeedbackProps = {
   onAsk?: () => void
 }
 
+/** Fragetext oben in der Rückmeldung, damit man Antwort und Frage vergleichen kann. */
+function questionOf(card: Card): string {
+  switch (card.type) {
+    case 'choice':
+    case 'free':
+      return card.payload.question
+    case 'matching':
+    case 'order':
+      return card.payload.prompt
+    case 'cloze':
+      return card.payload.text.replace(/\{\{(\d+)\}\}/g, (_m, n: string) => `[Lücke ${n}]`)
+  }
+}
+
+const mark = (ok: boolean) => (ok ? '✓' : '✗')
+const empty = (s: string | undefined) => (s && s.trim() ? s : '(leer)')
+
 function Details({ card, answer }: { card: Card; answer: Answer }) {
   if (card.type === 'choice' && answer.kind === 'choice') {
     const { options } = card.payload
@@ -24,14 +41,16 @@ function Details({ card, answer }: { card: Card; answer: Answer }) {
     const correct = options.find((o) => o.correct)
     return (
       <>
-        {chosen && !chosen.correct && (
-          <p className="why wrong">
-            <strong>Deine Wahl: {chosen.text}</strong>
+        {chosen && (
+          <p className={`why ${chosen.correct ? 'right' : 'wrong'}`}>
+            <strong>
+              {mark(chosen.correct)} Deine Wahl: {chosen.text}
+            </strong>
             <br />
             {chosen.why}
           </p>
         )}
-        {correct && (
+        {correct && !chosen?.correct && (
           <p className="why right">
             <strong>Richtig: {correct.text}</strong>
             <br />
@@ -43,34 +62,78 @@ function Details({ card, answer }: { card: Card; answer: Answer }) {
   }
   if (card.type === 'cloze' && answer.kind === 'cloze') {
     return (
-      <ul className="answers">
-        {card.payload.gaps.map((g, i) => (
-          <li key={i} className={answer.perGap[i] ? 'right' : 'wrong'}>
-            Lücke {i + 1}: {g.answers.join(' / ')}
-            {!answer.perGap[i] && answer.inputs[i] ? ` (du: ${answer.inputs[i]})` : ''}
-          </li>
-        ))}
+      <ul className="compare">
+        {card.payload.gaps.map((g, i) => {
+          const ok = Boolean(answer.perGap[i])
+          return (
+            <li key={i} className={ok ? 'right' : 'wrong'}>
+              {mark(ok)} Lücke {i + 1}: du: {empty(answer.inputs[i])}
+              {!ok && <span className="correct"> – richtig: {g.answers.join(' / ')}</span>}
+            </li>
+          )
+        })}
       </ul>
     )
   }
   if (card.type === 'matching' && answer.kind === 'matching') {
+    const { pairs } = card.payload
     return (
-      <ul className="answers">
-        {card.payload.pairs.map((p, i) => (
-          <li key={i} className={answer.mapping[i] === i ? 'right' : 'wrong'}>
-            {p.left} → {p.right}
-          </li>
-        ))}
+      <ul className="compare">
+        {pairs.map((p, i) => {
+          const ok = answer.mapping[i] === i
+          return (
+            <li key={i} className={ok ? 'right' : 'wrong'}>
+              {mark(ok)} {p.left} → du: {empty(pairs[answer.mapping[i] ?? -1]?.right)}
+              {!ok && <span className="correct"> – richtig: {p.right}</span>}
+            </li>
+          )
+        })}
       </ul>
     )
   }
-  if (card.type === 'order') {
+  if (card.type === 'order' && answer.kind === 'order') {
+    const { steps } = card.payload
     return (
-      <ol className="answers">
-        {card.payload.steps.map((s, i) => (
-          <li key={i}>{s}</li>
-        ))}
-      </ol>
+      <div className="compare-cols">
+        <div>
+          <h3>Deine Reihenfolge</h3>
+          <ol className="compare">
+            {answer.order.map((orig, pos) => (
+              <li key={pos} className={orig === pos ? 'right' : 'wrong'}>
+                {mark(orig === pos)} {steps[orig]}
+              </li>
+            ))}
+          </ol>
+        </div>
+        <div>
+          <h3>Richtige Reihenfolge</h3>
+          <ol className="compare">
+            {steps.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ol>
+        </div>
+      </div>
+    )
+  }
+  if (card.type === 'free' && answer.kind === 'free') {
+    return (
+      <>
+        <div className="why">
+          <strong>Deine Antwort:</strong>
+          <p className="own">{empty(answer.text)}</p>
+        </div>
+        <div className="why right">
+          <strong>Musterantwort:</strong>
+          <p>{card.payload.modelAnswer}</p>
+          <strong>Kernpunkte:</strong>
+          <ul>
+            {card.payload.keyPoints.map((k) => (
+              <li key={k}>{k}</li>
+            ))}
+          </ul>
+        </div>
+      </>
     )
   }
   return null
@@ -80,6 +143,7 @@ export function Feedback({ card, outcome, answer, onNext, onAsk }: FeedbackProps
   return (
     <section className={`feedback ${outcome}`} aria-live="polite">
       <h2 className="pixel">{TITLE[outcome]}</h2>
+      <p className="question">{questionOf(card)}</p>
       <Details card={card} answer={answer} />
       {card.explanation && <p className="explanation">{card.explanation}</p>}
       {card.source && (

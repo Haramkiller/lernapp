@@ -82,4 +82,18 @@ describe('StudyScreen', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Beenden' }))
     expect(screen.queryByText(/Dialog für/)).not.toBeInTheDocument()
   })
+
+  it('Schließen des Nachfragen-Dialogs lässt genau eine Rückmeldung stehen (auch mit key={card.id})', async () => {
+    await db.cards.bulkPut([choiceCard('c1')])
+    const renderAsk = (card: { id: string }, _a: unknown, close: () => void) => (
+      <button key={card.id} type="button" onClick={close}>
+        Schließen
+      </button>
+    )
+    const { container } = render(<StudyScreen now={() => NOW} rng={seededRng(1)} onExit={vi.fn()} renderAsk={renderAsk} />)
+    await userEvent.click(await screen.findByRole('button', { name: /Falsch A/ }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Nachfragen' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Schließen' }))
+    expect(container.querySelectorAll('section.feedback')).toHaveLength(1)
+  })
 })

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import { CardDraftSchema, type Card } from '@lernapp/shared'
 import { db } from '../data/db'
 import { loadSettings } from '../data/settings'
@@ -191,7 +191,9 @@ export function StudyScreen({
           <Question card={card} rng={rng} onAnswer={answer} />
         )}
       </ErrorBoundary>
-      {asking && result && renderAsk?.(card, result.answer, () => setAsking(false))}
+      {/* Eigener Schlüssel: renderAsk darf selbst key={card.id} setzen, ohne mit der ErrorBoundary zu kollidieren
+          (doppelte Schlüssel ließen nach dem Schließen eine zweite Rückmeldung stehen). */}
+      {asking && result && renderAsk && <Fragment key="ask">{renderAsk(card, result.answer, () => setAsking(false))}</Fragment>}
     </section>
   )
 }
