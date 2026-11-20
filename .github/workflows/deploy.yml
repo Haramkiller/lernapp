@@ -23,6 +23,25 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Supabase-Secrets prüfen
+        env:
+          URL: ${{ secrets.VITE_SUPABASE_URL }}
+          KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          case "$URL" in
+            https://supabase.com/*|*/dashboard/*)
+              echo "::error::VITE_SUPABASE_URL ist die Dashboard-Adresse. Richtig: https://<projekt-id>.supabase.co"; exit 1 ;;
+          esac
+          if ! printf '%s' "$URL" | grep -Eq '^https://[^/[:space:]]+$'; then
+            echo "::error::VITE_SUPABASE_URL muss so aussehen: https://<projekt-id>.supabase.co (ohne / am Ende)"; exit 1
+          fi
+          # Der Schlüssel landet öffentlich in der App: nur der publishable/anon-Schlüssel, nie der geheime.
+          if printf '%s' "$KEY" | grep -q '^sb_secret_'; then
+            echo "::error::VITE_SUPABASE_ANON_KEY ist der GEHEIME Schlüssel. Bitte den publishable/anon-Schlüssel verwenden und den geheimen in Supabase neu erzeugen."; exit 1
+          fi
+          if printf '%s' "$KEY" | cut -d. -f2 | base64 -d 2>/dev/null | grep -q '"role" *: *"service_role"'; then
+            echo "::error::VITE_SUPABASE_ANON_KEY ist der service_role-Schlüssel. Bitte den anon-Schlüssel verwenden und den service_role-Schlüssel in Supabase neu erzeugen."; exit 1
+          fi
       - run: npm ci
       - run: npm test
       - run: npm run build -w app

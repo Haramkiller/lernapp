@@ -22,8 +22,16 @@ export function SetupScreen({ onSave, initial, onBack, onReset }: Props) {
       setError('Bitte eine gültige URL eingeben (https://…).')
       return
     }
+    if (/^https?:\/\/(www\.)?supabase\.com\//i.test(url.trim())) {
+      setError('Das ist die Adresse des Supabase-Dashboards. Richtig ist die Projekt-URL: https://<projekt-id>.supabase.co')
+      return
+    }
     if (!key.trim()) {
       setError('Bitte den öffentlichen Schlüssel eingeben.')
+      return
+    }
+    if (key.trim().startsWith('sb_secret_')) {
+      setError('Das ist der geheime Schlüssel. Bitte den öffentlichen (publishable/anon) Schlüssel verwenden.')
       return
     }
     setError(null)

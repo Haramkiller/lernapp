@@ -49,4 +49,18 @@ describe('SetupScreen', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }))
     expect(onSave).toHaveBeenCalledWith({ url: 'https://x.supabase.co', key: 'k' })
   })
+
+  it('lehnt Dashboard-Adresse und geheimen Schlüssel mit Erklärung ab', async () => {
+    const onSave = vi.fn()
+    render(<SetupScreen onSave={onSave} />)
+    await userEvent.type(screen.getByLabelText('Supabase-URL'), 'https://supabase.com/dashboard/project/abc')
+    await userEvent.type(screen.getByLabelText('Öffentlicher Schlüssel'), 'sb_secret_x')
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+    expect(screen.getByRole('alert')).toHaveTextContent(/Dashboard/)
+    await userEvent.clear(screen.getByLabelText('Supabase-URL'))
+    await userEvent.type(screen.getByLabelText('Supabase-URL'), 'https://abc.supabase.co')
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+    expect(screen.getByRole('alert')).toHaveTextContent(/geheime Schlüssel/)
+    expect(onSave).not.toHaveBeenCalled()
+  }, 15_000)
 })
