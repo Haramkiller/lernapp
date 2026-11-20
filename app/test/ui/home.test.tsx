@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto'
 import './setup'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { db } from '../../src/data/db'
 import { HomeScreen } from '../../src/ui/HomeScreen'
 import { newSrsState, review } from '../../src/srs/scheduler'
@@ -31,6 +32,29 @@ describe('HomeScreen', () => {
     expect(await screen.findByText('Heute fällig: 1 · Neu: 2')).toBeInTheDocument()
     expect(screen.getByText('Botanik')).toBeInTheDocument()
     expect(screen.getByText('25 %')).toBeInTheDocument() // 1 von 4 nicht gelöschten Karten
+  })
+
+  it('großer Knopf startet den Kampf im Modul mit der meisten Arbeit', async () => {
+    await db.modules.bulkPut([
+      { id: 'm1', name: 'Zoologie', examDate: null, styleProfile: null, updatedAt: NOW.toISOString() },
+      { id: 'm2', name: 'Botanik', examDate: null, styleProfile: null, updatedAt: NOW.toISOString() },
+    ])
+    await db.cards.bulkPut([choiceCard('a', { moduleId: 'm1' }), choiceCard('b', { moduleId: 'm2' }), choiceCard('c', { moduleId: 'm2' })])
+    const onStudy = vi.fn()
+    render(<HomeScreen now={() => NOW} sync={{ kind: 'idle' }} onStudy={onStudy} onSettings={vi.fn()} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Kämpfen: Botanik' }))
+    expect(onStudy).toHaveBeenCalledWith('m2')
+  })
+
+  it('nichts zu tun: Knopf „Kämpfen“ ist gesperrt', async () => {
+    render(<HomeScreen now={() => NOW} sync={{ kind: 'idle' }} onStudy={vi.fn()} onSettings={vi.fn()} />)
+    expect(await screen.findByRole('button', { name: 'Kämpfen' })).toBeDisabled()
+  })
+
+  it('zeigt den Boss je Modul', async () => {
+    await db.modules.put({ id: 'm1', name: 'Botanik', examDate: null, styleProfile: null, updatedAt: NOW.toISOString() })
+    render(<HomeScreen now={() => NOW} sync={{ kind: 'idle' }} onStudy={vi.fn()} onSettings={vi.fn()} />)
+    expect(await screen.findByText(/· Botanik$/)).toBeInTheDocument()
   })
 
   it('zeigt Sync-Fehler und Quarantäne-Warnung', async () => {

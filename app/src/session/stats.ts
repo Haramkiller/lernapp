@@ -34,3 +34,21 @@ export function moduleProgress(
     return { module, total: mine.length, mastered, percent: mine.length === 0 ? 0 : Math.round((mastered / mine.length) * 100) }
   })
 }
+
+/** Modul mit der längsten heutigen Lernliste (Gleichstand: alphabetisch); nichts zu tun → undefined. */
+export function nextBattleModule(input: {
+  cards: Card[]
+  states: Map<string, SrsState>
+  newDoneToday: number
+  now: Date
+  settings: Settings
+  modules: Module[]
+}): Module | undefined {
+  const { modules, ...rest } = input
+  let best: { module: Module; size: number } | undefined
+  for (const module of [...modules].sort((a, b) => a.name.localeCompare(b.name, 'de'))) {
+    const size = buildQueue({ ...rest, moduleId: module.id }).length
+    if (size > 0 && (!best || size > best.size)) best = { module, size }
+  }
+  return best?.module
+}

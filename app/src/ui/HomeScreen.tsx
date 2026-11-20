@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { db } from '../data/db'
 import { loadSettings } from '../data/settings'
 import { newDoneKey } from '../session/queue'
-import { moduleProgress, todayCounts, type ModuleProgress } from '../session/stats'
+import { bossFor } from '../game/bosses'
+import { moduleProgress, nextBattleModule, todayCounts, type ModuleProgress } from '../session/stats'
+import type { Module } from '@lernapp/shared'
 
 export type SyncStatus =
   | { kind: 'idle' }
@@ -21,7 +23,7 @@ type Props = {
   onSyncNow?: () => void
 }
 
-type Data = { due: number; fresh: number; modules: ModuleProgress[]; dead: number }
+type Data = { due: number; fresh: number; modules: ModuleProgress[]; dead: number; next: Module | undefined }
 
 function syncText(s: SyncStatus): string {
   switch (s.kind) {
@@ -59,9 +61,10 @@ export function HomeScreen({ now = () => new Date(), sync, refreshKey = 0, onStu
       const newDoneToday = ((await db.meta.get(newDoneKey(t)))?.value as number | undefined) ?? 0
       const counts = todayCounts({ cards, states, newDoneToday, now: t, settings })
       const progress = moduleProgress(modules, cards, states, t, settings.retention)
+      const next = nextBattleModule({ cards, states, newDoneToday, now: t, settings, modules })
       if (!cancelled) {
         setError(null)
-        setData({ ...counts, modules: progress, dead })
+        setData({ ...counts, modules: progress, dead, next })
       }
       } catch (e) {
         if (!cancelled) setError(`Die Daten konnten nicht geladen werden: ${e instanceof Error ? e.message : String(e)}`)
@@ -86,8 +89,13 @@ export function HomeScreen({ now = () => new Date(), sync, refreshKey = 0, onStu
       ) : (
         <>
           <p className="today">{`Heute fällig: ${data.due} · Neu: ${data.fresh}`}</p>
-          <button type="button" className="primary big" onClick={() => onStudy()} disabled={data.due + data.fresh === 0}>
-            Lernen
+          <button
+            type="button"
+            className="primary big"
+            onClick={() => data.next && onStudy(data.next.id)}
+            disabled={data.next === undefined}
+          >
+            {data.next ? `Kämpfen: ${data.next.name}` : 'Kämpfen'}
           </button>
           <h2 className="pixel small">Module</h2>
           {data.modules.length === 0 ? (
@@ -98,6 +106,7 @@ export function HomeScreen({ now = () => new Date(), sync, refreshKey = 0, onStu
                 <li key={module.id}>
                   <button type="button" className="module" onClick={() => onStudy(module.id)} aria-label={`${module.name} lernen`}>
                     <span className="module-name">{module.name}</span>
+                    <span className="muted boss-of">{bossFor(module.id, data.modules.map((p) => p.module)).name}</span>
                     <span className="pixel small">{percent} %</span>
                     <span className="bar" aria-hidden="true">
                       <span style={{ width: `${percent}%` }} />
