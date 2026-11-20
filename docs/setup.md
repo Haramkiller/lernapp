@@ -14,6 +14,7 @@ Diese Anleitung ist für Menschen ohne Programmierkenntnisse gedacht. Du brauchs
 4. Tabellen anlegen: Links im Menü **SQL Editor** öffnen, dann **New query**. Öffne in diesem Projekt die Datei `supabase/schema.sql`, kopiere den **gesamten** Inhalt, füge ihn in das Editor-Fenster ein und klicke **Run**. Es sollte „Success“ erscheinen.
 5. Anmeldung per E-Mail: **Authentication** → **Sign In / Providers** (je nach Version nur **Providers**) → **Email** muss aktiviert sein (ist standardmäßig an).
 6. Optional, aber bequem: Im selben Bereich bei **Email** die Option **Confirm email** ausschalten. Dann kannst du dich ohne Bestätigungs-Mail sofort anmelden. Bei eingeschalteter Option bekommt jeder neue Nutzer erst eine E-Mail mit Bestätigungslink.
+   Lässt du sie an, trage unter **Authentication** → **URL Configuration** als **Site URL** die Adresse deiner App ein (z. B. `https://DEIN-GITHUB-NAME.github.io/lernapp/`) und klicke **Save changes**. Sonst führt der Link in der Mail zu `localhost:3000` und zeigt „Verbindung abgelehnt“ (die Bestätigung selbst klappt trotzdem).
 7. Zugangsdaten holen: **Project Settings** (Zahnrad) → **API** (in neueren Versionen: **API Keys**). Notiere dir:
    - **Project URL**, sieht aus wie `https://abcdefgh.supabase.co`
    - den **anon**- bzw. **publishable**-Schlüssel (der öffentliche Schlüssel). **Niemals** den `service_role`-/`secret`-Schlüssel verwenden oder weitergeben.
@@ -105,3 +106,5 @@ Wer die Werkstatt nutzen will, braucht zusätzlich Abschnitt 3 auf dem eigenen P
 **Sync-Warnungen:** Meist vorübergehend. Deine Antworten bleiben auf dem Gerät gespeichert und werden beim nächsten erfolgreichen Abgleich übertragen. Bleibt die Warnung, abmelden und wieder anmelden und prüfen, ob `schema.sql` vollständig ausgeführt wurde (Abschnitt 1, Schritt 4).
 
 **Anmeldung geht nicht („E-Mail nicht bestätigt“):** Entweder den Link in der Bestätigungs-Mail anklicken (auch im Spam-Ordner schauen) oder in Supabase **Confirm email** ausschalten (Abschnitt 1, Schritt 6).
+
+**Bestätigungslink zeigt „localhost hat die Verbindung abgelehnt“:** Die Site URL steht noch auf dem Standard. Die E-Mail ist trotzdem bestätigt, einfach in der App anmelden. Danach die Site URL umstellen (Abschnitt 1, Schritt 6).
