@@ -1,34 +1,43 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 
 export type AuthMode = 'signIn' | 'signUp'
+/** 'confirm' = Konto angelegt, die E-Mail muss noch bestätigt werden. */
+export type AuthResult = 'confirm' | void
 
 type Props = {
-  /** Wirft bei Fehlern; ein zurückgegebener Text wird als Hinweis angezeigt. */
-  onSubmit: (mode: AuthMode, email: string, password: string) => Promise<string | void>
-  /** Adresse der eigenen Datenbank, falls eine eingetragen ist (sonst eingebaute). */
-  database?: string
-  /** Öffnet die Einrichtung für eine eigene Datenbank. */
-  onUseOwnDatabase?: () => void
+  mode: AuthMode
+  title: string
+  submitLabel: string
+  initialEmail?: string
+  /** Wirft bei Fehlern. */
+  onSubmit: (email: string, password: string) => Promise<AuthResult>
+  onBack?: () => void
+  /** Text unter der Überschrift (z. B. Fortschritt, Erklärung). */
+  children?: ReactNode
 }
 
-export function LoginScreen({ onSubmit, database, onUseOwnDatabase }: Props) {
-  const [mode, setMode] = useState<AuthMode>('signIn')
-  const [email, setEmail] = useState('')
+const message = (err: unknown) => (err instanceof Error ? err.message : String(err))
+
+/** Formular für Anmelden oder Konto anlegen; welcher Fall gilt, bestimmt der Aufrufer (WelcomeFlow). */
+export function LoginScreen({ mode, title, submitLabel, initialEmail = '', onSubmit, onBack, children }: Props) {
+  const [email, setEmail] = useState(initialEmail)
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [info, setInfo] = useState<string | null>(null)
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     setBusy(true)
     setError(null)
-    setInfo(null)
     try {
-      const msg = await onSubmit(mode, email.trim(), password)
-      if (msg) setInfo(msg)
+      await onSubmit(email.trim(), password)
     } catch (err) {
-      setError(`${mode === 'signIn' ? 'Anmeldung' : 'Registrierung'} fehlgeschlagen: ${err instanceof Error ? err.message : String(err)}`)
+      const text = message(err)
+      setError(
+        /not confirmed/i.test(text)
+          ? 'Deine E-Mail ist noch nicht bestätigt. Tippe zuerst auf den Link in der Mail.'
+          : `${mode === 'signIn' ? 'Anmeldung' : 'Registrierung'} fehlgeschlagen: ${text}`,
+      )
     } finally {
       setBusy(false)
     }
@@ -36,7 +45,8 @@ export function LoginScreen({ onSubmit, database, onUseOwnDatabase }: Props) {
 
   return (
     <form onSubmit={submit} className="card-panel">
-      <h1 className="pixel">{mode === 'signIn' ? 'Anmelden' : 'Registrieren'}</h1>
+      <h1 className="pixel">{title}</h1>
+      {children}
       <label className="field">
         <span>E-Mail</span>
         <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -52,20 +62,21 @@ export function LoginScreen({ onSubmit, database, onUseOwnDatabase }: Props) {
           onChange={(e) => setPassword(e.target.value)}
         />
       </label>
-      {error && <p role="alert" className="warn">{error}</p>}
-      {info && <p role="status">{info}</p>}
-      <button type="submit" className="primary" disabled={busy}>
-        {mode === 'signIn' ? 'Anmelden' : 'Registrieren'}
-      </button>
-      <button type="button" className="link" onClick={() => setMode(mode === 'signIn' ? 'signUp' : 'signIn')}>
-        {mode === 'signIn' ? 'Noch kein Konto? Registrieren' : 'Schon ein Konto? Anmelden'}
-      </button>
-      {database && <p className="muted">Eigene Datenbank: {database}</p>}
-      {onUseOwnDatabase && (
-        <button type="button" className="link" onClick={onUseOwnDatabase}>
-          Eigene Datenbank verwenden
-        </button>
+      {error && (
+        <p role="alert" className="warn">
+          {error}
+        </p>
       )}
+      <div className="row">
+        <button type="submit" className="primary" disabled={busy}>
+          {submitLabel}
+        </button>
+        {onBack && (
+          <button type="button" onClick={onBack}>
+            Zurück
+          </button>
+        )}
+      </div>
     </form>
   )
 }

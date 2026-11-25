@@ -167,6 +167,22 @@ button.wrong {
   flex-direction: column;
   gap: 14px;
 }
+.card-panel p {
+  margin: 0;
+}
+/* Willkommensseite: zwei große Knöpfe untereinander, gut mit dem Daumen erreichbar. */
+.welcome-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 8px 0;
+}
+.welcome-choices button {
+  min-height: 52px;
+}
+.step-progress {
+  font-size: 10px;
+}
 .field {
   display: flex;
   flex-direction: column;
