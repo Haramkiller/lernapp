@@ -7,6 +7,12 @@
   python slice_assets.py boss <character.zip> <ziel-ordner> idle=<anim> attack=<anim> hit=<anim>
       Holt die Süd-Bilder der genannten Animationen aus dem Charakter-ZIP und legt alle
       mittig auf eine gemeinsame Leinwand (sonst springt der Boss beim Wechsel der Animation).
+
+  python slice_assets.py foot <größe> <ziel.png> <quelle.png>
+      Pflanzen/Bäume: auf quadratische Leinwand <größe>, Fuß (unterste Pixel) unten mittig.
+
+  python slice_assets.py flap <größe> <ziel-ordner> <name> <quelle.png>
+      Insekten: 4 Bilder Flügelschlag durch waagerechtes Stauchen (100/70/35/70 %).
 """
 import io
 import json
@@ -61,6 +67,32 @@ def boss(zip_path: str, out: str, mapping: dict[str, str]) -> None:
     print(f"Leinwand {w}x{h}")
 
 
+def foot(size: str, out: str, src: str) -> None:
+    n = int(size)
+    im = Image.open(src).convert("RGBA")
+    im = im.crop(im.getbbox())
+    if im.width > n or im.height > n:
+        im.thumbnail((n, n), Image.NEAREST)
+    canvas = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    canvas.paste(im, ((n - im.width) // 2, n - im.height))
+    Path(out).parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(out, optimize=True)
+
+
+def flap(size: str, out: str, name: str, src: str) -> None:
+    n = int(size)
+    im = Image.open(src).convert("RGBA")
+    im = im.crop(im.getbbox())
+    Path(out).mkdir(parents=True, exist_ok=True)
+    for i, f in enumerate((1.0, 0.7, 0.35, 0.7)):
+        w = max(2, round(im.width * f))
+        frame = im.resize((w, im.height), Image.NEAREST)
+        canvas = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+        canvas.paste(frame, ((n - w) // 2, (n - im.height) // 2))
+        canvas.save(Path(out) / f"{name}_{i}.png", optimize=True)
+    print(f"{name}: 4 Bilder, {n}x{n}")
+
+
 if __name__ == "__main__":
     cmd, *args = sys.argv[1:]
     if cmd == "fx":
@@ -68,5 +100,9 @@ if __name__ == "__main__":
     elif cmd == "boss":
         zip_path, out, *pairs = args
         boss(zip_path, out, dict(p.split("=", 1) for p in pairs))
+    elif cmd == "foot":
+        foot(*args)
+    elif cmd == "flap":
+        flap(*args)
     else:
         sys.exit(__doc__)
