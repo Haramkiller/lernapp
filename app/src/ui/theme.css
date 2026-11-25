@@ -1257,6 +1257,8 @@ button.cta:disabled {
 .plant {
   position: absolute;
   aspect-ratio: 1;
+  /* Trefferfläche nie unter 32 px, auch wenn die Szene schmal ist. */
+  min-width: 32px;
   min-height: 0;
   padding: 0;
   border: 0;
@@ -1382,5 +1384,5 @@ button.cta:disabled {
 }
 /* Querformat: Szene so schmal, dass die Gehen-Knöpfe ohne Scrollen sichtbar bleiben. */
 .greenhouse .scene {
-  max-width: min(480px, calc((100dvh - 190px) * 0.75));
+  max-width: min(480px, max(280px, calc((100dvh - 190px) * 0.75)));
 }

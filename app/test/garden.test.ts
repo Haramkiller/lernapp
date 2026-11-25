@@ -70,7 +70,25 @@ describe('buildGarden', () => {
     expect(input(allSecure)[1]!.tree).toBe('none')
     const won: Milestones = { securedAt: new Map(), defeatedAt: new Map([['m1', iso]]) }
     expect(input(allSecure, won)[1]!.tree).toBe('bloom')
-    expect(input(new Map([['a', secure('a')], ['b', faded('b')]]), won)[1]!.tree).toBe('wilted')
+    // Beim Sieg saßen alle Themen sicher, also haben sie ihren Meilenstein.
+    const wonAll: Milestones = { securedAt: new Map([['t1', iso], ['t2', iso]]), defeatedAt: new Map([['m1', iso]]) }
+    expect(input(new Map([['a', secure('a')], ['b', faded('b')]]), wonAll)[1]!.tree).toBe('wilted')
+  })
+
+  it('Baum welkt nicht, nur weil neue Karten oder Themen dazukommen (Spec 6.5)', () => {
+    const wonAll: Milestones = { securedAt: new Map([['t1', iso], ['t2', iso]]), defeatedAt: new Map([['m1', iso]]) }
+    const withNew = buildGarden({
+      modules,
+      topics: [...topics, topic('t4', 'm1', 'Neu')],
+      cards: [...cards, choiceCard('n', { moduleId: 'm1', topicId: 't4' })],
+      states: new Map([['a', secure('a')], ['b', secure('b')]]),
+      now: NOW,
+      retention: 0.9,
+      chosen: new Map(),
+      milestones: wonAll,
+    })
+    expect(withNew[1]!.plants.find((p) => p.topic.id === 't4')!.stage).toBe('seed')
+    expect(withNew[1]!.tree).toBe('bloom')
   })
 
   it('welk über den Meilenstein des Themas; Schild zählt unsichere gelernte Karten', () => {

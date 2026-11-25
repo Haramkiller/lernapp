@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import 'fake-indexeddb/auto'
 import './setup'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -130,6 +132,27 @@ describe('GreenhouseScreen', () => {
     const b = open()
     await btn('Thema 1')
     expect(b.container.querySelectorAll('.insect').length).toBeGreaterThan(0)
+  })
+
+  it('viele Themen: keine Pflanze verschwindet – Fernansicht zeigt „+N“, Nahansicht blättert weiter', async () => {
+    await mod('m1', 'Botanik')
+    for (let i = 1; i <= 14; i++) await topic(`t${i}`, 'm1', `Thema ${String(i).padStart(2, '0')}`, [[`c${i}`, null]])
+    open()
+    expect(await screen.findByText('Botanik · +8')).toBeInTheDocument()
+    await userEvent.click(await btn('↶ Links'))
+    expect(await btn('Thema 12')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Thema 13' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Beet ›' }))
+    expect(screen.getByRole('button', { name: 'Thema 13' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Thema 14' })).toBeInTheDocument()
+    expect(screen.getByText('Botanik · 2/2')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Beet ›' })).toBeDisabled()
+  })
+
+  it('Pflanzen behalten mindestens 32 px Trefferfläche (CSS)', () => {
+    const css = readFileSync(join(__dirname, '../../src/ui/theme.css'), 'utf-8')
+    const rule = css.match(/\n\.plant \{[^}]*\}/)?.[0] ?? ''
+    expect(rule).toContain('min-width: 32px')
   })
 
   it('ohne Module: Hinweis auf die Werkstatt', async () => {

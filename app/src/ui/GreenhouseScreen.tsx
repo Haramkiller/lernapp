@@ -138,7 +138,13 @@ export function GreenhouseScreen({ now = () => new Date(), sync, refreshKey = 0,
     left: data.beds.filter((_, i) => i % 2 === 0),
     right: data.beds.filter((_, i) => i % 2 === 1),
   }
-  const bedFor = (side: Side) => sides[side][near ? Math.min(page[side], sides[side].length - 1) : 0]
+  // Nahansicht: jedes Beet hat so viele Teile, wie es Pflanzen braucht – keine Pflanze verschwindet.
+  const perPart = GARDEN_VIEWS.beetL.beds[0]!.max
+  const parts = (s: Side) =>
+    sides[s].flatMap((bed) => {
+      const of = Math.max(1, Math.ceil(bed.plants.length / perPart))
+      return Array.from({ length: of }, (_, k) => ({ bed, start: k * perPart, part: k + 1, of }))
+    })
   const insects = Math.min(8, Math.floor(bloomCount(data.beds) / 2))
 
   const go = (move: Move) => {
@@ -154,9 +160,24 @@ export function GreenhouseScreen({ now = () => new Date(), sync, refreshKey = 0,
   }
 
   const renderBed = (area: BedArea, key: number) => {
-    const bed = bedFor(area.side)
-    if (!bed) return null
-    const slots = slotPositions(area, bed.plants.length)
+    let bed: BedView | undefined
+    let start = 0
+    let label = ''
+    if (near) {
+      const list = parts(area.side)
+      const p = list[Math.min(page[area.side], list.length - 1)]
+      if (!p) return null
+      bed = p.bed
+      start = p.start
+      label = p.of > 1 ? `${bed.module.name} · ${p.part}/${p.of}` : bed.module.name
+    } else {
+      bed = sides[area.side][0]
+      if (!bed) return null
+      const extra = bed.plants.length - area.max
+      label = extra > 0 ? `${bed.module.name} · +${extra}` : bed.module.name
+    }
+    const shown = bed.plants.slice(start, start + area.max)
+    const slots = slotPositions(area, shown.length)
     const cx = area.x + area.w / 2
     return (
       <div key={key} className="bed">
@@ -164,7 +185,7 @@ export function GreenhouseScreen({ now = () => new Date(), sync, refreshKey = 0,
           <img className="tree" src={treeImage(bed.tree)} alt="" draggable={false} style={{ left: `${cx}%`, top: `${area.y}%`, width: `${46 * area.scale}%` }} />
         )}
         {slots.map((s, i) => {
-          const p = bed.plants[i]!
+          const p = shown[i]!
           return (
             <button
               key={p.topic.id}
@@ -174,7 +195,7 @@ export function GreenhouseScreen({ now = () => new Date(), sync, refreshKey = 0,
               style={{ left: `${s.x}%`, top: `${s.y}%`, width: `${s.size}%` }}
               onClick={(e) => {
                 e.stopPropagation()
-                setSign(plantSign(p, bed.module.name))
+                setSign(plantSign(p, bed!.module.name))
               }}
             >
               <img src={plantImage(p.species, p.stage)} alt="" draggable={false} />
@@ -182,14 +203,14 @@ export function GreenhouseScreen({ now = () => new Date(), sync, refreshKey = 0,
           )
         })}
         <span className={`bed-sign${near ? ' near' : ''}`} style={{ left: `${cx}%`, top: `${area.y + area.h + (near ? 9 : 4)}%` }}>
-          {bed.module.name}
+          {label}
         </span>
       </div>
     )
   }
 
   const side: Side | null = near ? v.beds[0]!.side : null
-  const pages = side ? sides[side].length : 0
+  const pages = side ? parts(side).length : 0
   const current = side ? Math.min(page[side], pages - 1) : 0
 
   return (

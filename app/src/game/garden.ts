@@ -88,8 +88,8 @@ export function buildGarden(input: {
           securePct: Math.round((secure / own.length) * 100),
         }
       })
-    const allBloom = plants.length > 0 && plants.every((p) => p.stage === 'bloom')
-    const tree = !milestones.defeatedAt.has(module.id) ? 'none' : allBloom ? 'bloom' : 'wilted'
+    // Wie die Pflanzen: welk nur, wenn Gelerntes verblasst – neue Karten oder Themen lassen nichts welken.
+    const tree = !milestones.defeatedAt.has(module.id) ? 'none' : plants.some((p) => p.stage === 'wilted') ? 'wilted' : 'bloom'
     return { module, region, plants, tree }
   })
 }
