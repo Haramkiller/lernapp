@@ -116,6 +116,12 @@ export function BattleScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moduleId, reload])
 
+  // Nach dem Antworten wird die Seite kürzer; ohne Sprung läge die Rückmeldung unter dem oben festen Boss.
+  const top = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (result) top.current?.scrollIntoView?.({ block: 'start' })
+  }, [result])
+
   const done = cards !== null && cards.length > 0 && (ended || index >= cards.length)
   useEffect(() => {
     if (done && !finished.current) {
@@ -216,7 +222,7 @@ export function BattleScreen({
   }
 
   return (
-    <section className="battle">
+    <section className="battle" ref={top}>
       <Arena boss={boss} name={name} battle={battle} turn={turn} active={result !== null} />
       <div className="battle-main">
         <div className="row between">

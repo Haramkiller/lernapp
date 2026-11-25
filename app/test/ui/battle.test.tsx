@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import 'fake-indexeddb/auto'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import './setup'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
@@ -110,6 +112,19 @@ describe('BattleScreen: Kampf', () => {
   const next = async () => userEvent.click(await screen.findByRole('button', { name: 'Weiter' }))
 
   afterEach(() => vi.unstubAllGlobals())
+
+  it('nach dem Antworten springt die Ansicht hoch, damit die Rückmeldung nicht unter dem Boss liegt', async () => {
+    const scroll = vi.fn()
+    Element.prototype.scrollIntoView = scroll
+    await botanik()
+    await cards(2)
+    const { container } = render(<BattleScreen moduleId="m1" now={() => NOW} rng={NO_LUCK} onExit={vi.fn()} />)
+    await right()
+    await screen.findByRole('button', { name: 'Weiter' })
+    expect(scroll).toHaveBeenCalled()
+    expect(scroll.mock.contexts[0]).toBe(container.querySelector('.battle'))
+    delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView
+  })
 
   it('zeigt Boss mit Modulnamen und vollem Leben', async () => {
     await botanik()
@@ -267,5 +282,15 @@ describe('BattleScreen: Kampf', () => {
     render(<BattleScreen now={() => NOW} rng={NO_LUCK} onExit={vi.fn()} />)
     await right()
     await vi.waitFor(() => expect(bar()).toHaveAttribute('aria-valuenow', '50'))
+  })
+})
+
+describe('Kampf-Layout am Handy', () => {
+  it('der Boss bleibt beim Scrollen oben stehen (CSS)', () => {
+    const css = readFileSync(join(__dirname, '../../src/ui/theme.css'), 'utf-8')
+    const block = css.match(/@media \(max-width: 899px\), \(orientation: portrait\) \{[\s\S]*?\n\}/)?.[0] ?? ''
+    expect(block).toMatch(/\.arena \{[^}]*position: sticky;[^}]*top: 0;/)
+    // overflow-x: hidden auf html/body machte body zum Scroll-Container und hebelte sticky aus.
+    expect(css).toMatch(/html,\s*body \{[^}]*overflow-x: clip;/)
   })
 })

@@ -29,6 +29,8 @@ body {
   font-size: 17px;
   line-height: 1.5;
   overflow-x: hidden;
+  /* clip statt hidden: macht body nicht zum Scroll-Container, sonst wirkt position: sticky nicht. */
+  overflow-x: clip;
 }
 
 .app {
@@ -553,6 +555,17 @@ button.module {
   }
   .boss.lunge {
     transform: translateX(-50%);
+  }
+}
+/* Handy: Boss bleibt beim Scrollen oben stehen, damit Treffer und Angriff beim Antworten sichtbar sind. */
+@media (max-width: 899px), (orientation: portrait) {
+  .arena {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    height: min(30vh, 260px);
+    min-height: 170px;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
   }
 }
 @media (min-width: 900px) and (orientation: landscape) {
