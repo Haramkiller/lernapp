@@ -161,7 +161,7 @@ export function GreenhouseScreen({ now = () => new Date(), sync, refreshKey = 0,
     return (
       <div key={key} className="bed">
         {near && bed.tree !== 'none' && (
-          <img className="tree" src={treeImage(bed.tree)} alt="" draggable={false} style={{ left: `${cx}%`, top: `${area.y}%`, width: `${30 * area.scale}%` }} />
+          <img className="tree" src={treeImage(bed.tree)} alt="" draggable={false} style={{ left: `${cx}%`, top: `${area.y}%`, width: `${46 * area.scale}%` }} />
         )}
         {slots.map((s, i) => {
           const p = bed.plants[i]!

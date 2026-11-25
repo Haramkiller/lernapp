@@ -48,7 +48,7 @@ function fakeClient(initial: GetSession) {
 const retryable = () => new AuthRetryableFetchError('Failed to fetch', 0)
 /** Erster Bildschirm nach der Anmeldung: das Titelbild. */
 const home = () => screen.findByRole('button', { name: "Los geht's" })
-/** Titelbild → Waldplatz → Menü. */
+/** Titelbild → Gewächshaus → Menü. */
 async function openMenu() {
   await userEvent.click(await home())
   await userEvent.click(await screen.findByRole('button', { name: 'Menü' }))
@@ -253,7 +253,38 @@ describe('App: eigene Datenbank vor der Anmeldung', () => {
   })
 })
 
+/** Gewächshaus → Tür → Lagerfeuer. */
+async function toCamp() {
+  await userEvent.click(await screen.findByRole('button', { name: '↑ Vorwärts' }))
+  await userEvent.click(await screen.findByRole('button', { name: '↑ Zum Lagerfeuer' }))
+}
+
 describe('App: Titelbild, Lagerfeuer, Kampf', () => {
+  it('Titelbild → Gewächshaus → Tür → Lagerfeuer → zurück ins Gewächshaus', async () => {
+    const { client } = fakeClient({ data: { session: session('u1') }, error: null })
+    render(<App env={env} makeClient={() => client} />)
+    await userEvent.click(await home())
+    expect(await screen.findByText('Eingang')).toBeInTheDocument()
+    await toCamp()
+    expect(await screen.findByRole('button', { name: 'Lagerfeuer – Karte öffnen' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Gewächshaus' }))
+    expect(await screen.findByText('Eingang')).toBeInTheDocument()
+  })
+
+  it('Einstellungen „Zurück“ führt in die Szene, aus der man kam', async () => {
+    const { client } = fakeClient({ data: { session: session('u1') }, error: null })
+    render(<App env={env} makeClient={() => client} />)
+    await openMenu()
+    await userEvent.click(await screen.findByRole('button', { name: 'Einstellungen' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Zurück' }))
+    expect(await screen.findByText('Eingang')).toBeInTheDocument()
+    await toCamp()
+    await userEvent.click(await screen.findByRole('button', { name: 'Menü' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Einstellungen' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Zurück' }))
+    expect(await screen.findByRole('button', { name: 'Lagerfeuer – Karte öffnen' })).toBeInTheDocument()
+  })
+
   it('nach einem Kampf mit einer Antwort zurück ans Feuer; der Zeitpunkt für „Ausgeruht“ ist gespeichert', async () => {
     const iso = new Date().toISOString()
     await db.modules.put({ id: 'm1', name: 'Botanik', examDate: null, styleProfile: null, updatedAt: iso })
@@ -262,6 +293,7 @@ describe('App: Titelbild, Lagerfeuer, Kampf', () => {
     const { client } = fakeClient({ data: { session: session('u1') }, error: null })
     render(<App env={env} makeClient={() => client} />)
     await userEvent.click(await home())
+    await toCamp()
     await userEvent.click(await screen.findByRole('button', { name: 'Lagerfeuer – Karte öffnen' }))
     await userEvent.click(await screen.findByRole('button', { name: 'Wald: Botanik' }))
     await userEvent.click(await screen.findByRole('button', { name: 'Kämpfen' }))

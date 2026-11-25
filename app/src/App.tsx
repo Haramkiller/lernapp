@@ -10,13 +10,19 @@ import { saveLastBattleAt } from './data/game'
 import { AskDialog } from './ui/AskDialog'
 import { InstallHint } from './ui/InstallHint'
 import { CampScreen, type SyncStatus } from './ui/CampScreen'
+import { GreenhouseScreen } from './ui/GreenhouseScreen'
 import { TitleScreen } from './ui/TitleScreen'
 import { LoginScreen, type AuthMode } from './ui/LoginScreen'
 import { SettingsScreen } from './ui/SettingsScreen'
 import { SetupScreen } from './ui/SetupScreen'
 import { BattleScreen } from './ui/BattleScreen'
 
-type View = { name: 'title' } | { name: 'camp' } | { name: 'study'; moduleId?: string; rested: boolean } | { name: 'settings' }
+type Scene = 'greenhouse' | 'camp'
+type View =
+  | { name: 'title' }
+  | { name: Scene }
+  | { name: 'study'; moduleId?: string; rested: boolean }
+  | { name: 'settings'; from: Scene }
 
 const defaultEnv = { url: import.meta.env.VITE_SUPABASE_URL as string | undefined, key: import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined }
 
@@ -195,14 +201,24 @@ export function App({ env = defaultEnv, makeClient = createAppClient, confirm = 
   return (
     <main className="app">
       <InstallHint />
-      {view.name === 'title' && <TitleScreen refreshKey={refreshKey} onStart={() => setView({ name: 'camp' })} />}
+      {view.name === 'title' && <TitleScreen refreshKey={refreshKey} onStart={() => setView({ name: 'greenhouse' })} />}
+      {view.name === 'greenhouse' && (
+        <GreenhouseScreen
+          sync={status}
+          refreshKey={refreshKey}
+          onCamp={() => setView({ name: 'camp' })}
+          onSettings={() => setView({ name: 'settings', from: 'greenhouse' })}
+          onSyncNow={() => void runSync()}
+        />
+      )}
       {view.name === 'camp' && (
         <CampScreen
           sync={status}
           refreshKey={refreshKey}
           onBattle={(moduleId, rested) => setView({ name: 'study', moduleId, rested })}
-          onSettings={() => setView({ name: 'settings' })}
+          onSettings={() => setView({ name: 'settings', from: 'camp' })}
           onSyncNow={() => void runSync()}
+          onGreenhouse={() => setView({ name: 'greenhouse' })}
         />
       )}
       {view.name === 'study' && (
@@ -224,7 +240,7 @@ export function App({ env = defaultEnv, makeClient = createAppClient, confirm = 
       )}
       {view.name === 'settings' && (
         <SettingsScreen
-          onBack={() => setView({ name: 'camp' })}
+          onBack={() => setView({ name: view.from })}
           onOverrideChanged={() => void loadConfig()}
           onLogout={async () => {
             // scope local: auth-js entfernt die gespeicherte Sitzung auch ohne Netz (global bräche vorher ab).

@@ -51,7 +51,7 @@ export type GardenView = { image: string; mirror?: boolean; name: string; moves:
 /** 32 px Trefferfläche bei 375 px Breite. */
 export const MIN_PLANT_SIZE = (32 / 375) * 100
 /** Pflanzenbreite in der Nahansicht (% der Kulisse). */
-const NEAR_SIZE = 16
+const NEAR_SIZE = 28
 
 const view = (name: string) => gameAsset(`garden/views/${name}.png`)
 /** Fernansichten: je Seite das hintere, ganz sichtbare Beet (ausgemessen an gang.png / zurueck.png). */
@@ -95,7 +95,7 @@ export function slotPositions(area: BedArea, count: number): { x: number; y: num
   const rows = n > Math.ceil(area.max / 2) ? 2 : 1
   const perRow = Math.ceil(n / rows)
   const gap = area.w / perRow
-  const size = Math.max(MIN_PLANT_SIZE, Math.min(NEAR_SIZE * area.scale, gap))
+  const size = Math.max(MIN_PLANT_SIZE, Math.min(NEAR_SIZE * area.scale, gap * 1.8))
   return Array.from({ length: n }, (_, i) => {
     const row = rows === 2 ? Math.floor(i / perRow) : 0
     const col = i - row * perRow
