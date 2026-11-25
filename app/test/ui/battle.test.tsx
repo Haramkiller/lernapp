@@ -190,7 +190,7 @@ describe('BattleScreen: Kampf', () => {
     expect(screen.queryByText(/Combo ×/)).not.toBeInTheDocument()
     await next()
     await right()
-    expect(screen.getByText('Combo ×3')).toBeInTheDocument()
+    expect(await screen.findByText('Combo ×3')).toBeInTheDocument()
   })
 
   it('Krit bei lange nicht gesehener Karte', async () => {
@@ -199,7 +199,7 @@ describe('BattleScreen: Kampf', () => {
     await db.states.put({ cardId: 'k0', state: review(newSrsState(earlier), 3, earlier, { cardId: 'k0' }).state, updatedAt: earlier.toISOString() })
     render(<BattleScreen now={() => NOW} rng={NO_LUCK} onExit={vi.fn()} />)
     await right()
-    expect(screen.getByText('Kritisch!')).toBeInTheDocument()
+    expect(await screen.findByText('Kritisch!')).toBeInTheDocument()
   })
 
   it('Abschluss zeigt vorher → nachher', async () => {

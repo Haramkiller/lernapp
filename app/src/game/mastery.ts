@@ -57,6 +57,14 @@ export function cardLife(s: SrsState | undefined, now: Date, retention: number):
   return CARD_LIFE * (1 - stable * kept)
 }
 
+/** Darunter gilt Leben als 0 (nur Rechenrauschen; eine sichere Karte hat exakt 0). */
+export const LIFE_EPSILON = 1e-6
+
+/** Angezeigtes Leben: 0 nur, wenn wirklich alles sicher sitzt; sonst mindestens 1. */
+export function shownLife(hp: number): number {
+  return hp < LIFE_EPSILON ? 0 : Math.max(1, Math.round(hp))
+}
+
 /** `hp` ungerundet; `max` = 10 je Karte. */
 export type Life = { hp: number; max: number }
 
@@ -68,7 +76,8 @@ export function bossLife(cards: Card[], states: Map<string, SrsState>, now: Date
 
 /** Anteil (0–100) am Höchstwert; null ohne Karten. */
 export function lifePercent(life: Life): number | null {
-  return life.max === 0 ? null : Math.round((life.hp / life.max) * 100)
+  if (life.max === 0) return null
+  return life.hp < LIFE_EPSILON ? 0 : Math.max(1, Math.round((life.hp / life.max) * 100))
 }
 
 export type Quest = { done: number; total: number }

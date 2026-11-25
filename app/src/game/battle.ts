@@ -1,6 +1,6 @@
 import type { Outcome } from '../srs/grading'
 import type { Rng } from '../ui/random'
-import type { Life } from './mastery'
+import { LIFE_EPSILON, shownLife, type Life } from './mastery'
 
 export type Tier = 1 | 2 | 3
 /** `secured`: die Karte sitzt nach dieser Antwort sicher (ihr Leben fiel auf 0). */
@@ -8,7 +8,7 @@ export type Hit = { outcome: Outcome; damage: number; tier: Tier; crit: boolean;
 export type Battle = {
   total: number
   answered: number
-  /** Exaktes Boss-Leben beim Start und Summe der exakten Schäden; Anzeige = round(start − dealt). */
+  /** Exaktes Boss-Leben beim Start und Summe der exakten Schäden; Anzeige = shownLife(start − dealt). */
   start: number
   dealt: number
   /** Exaktes echtes Leben: steigt auch, z. B. wenn eine falsche Antwort eine Karte schwächer macht. */
@@ -33,7 +33,7 @@ export const RESTED_LUCKY_CHANCE = 0.25
 const tierOf = (combo: number): Tier => (combo >= 6 ? 3 : combo >= 3 ? 2 : 1)
 
 export function startBattle(total: number, life: Life): Battle {
-  const hp = Math.round(life.hp)
+  const hp = shownLife(life.hp)
   return {
     total,
     answered: 0,
@@ -75,7 +75,7 @@ export function applyAnswer(
   // Falsch macht nie Schaden (vom Nutzer so gewählt), auch wenn eine neue Karte dabei ein wenig gelernt wurde.
   const dealt = b.dealt + (a.outcome === 'wrong' ? 0 : Math.max(0, a.before - a.after))
   // Die Summe wird gerundet, nicht jeder Schaden: so gehen die angezeigten Zahlen auf und erreichen 0.
-  const hp = Math.max(0, Math.round(b.start - dealt))
+  const hp = shownLife(b.start - dealt)
   const secured = a.before > 0 && a.after === 0
   const answered = b.answered + 1
   return {
@@ -100,7 +100,7 @@ export function hpPercent(b: Battle): number {
   return b.maxHp === 0 ? 0 : Math.round((b.hp / b.maxHp) * 100)
 }
 
-/** Endgültig besiegt: das echte Leben ist (gerundet) 0, alle Karten sitzen sicher. */
+/** Endgültig besiegt: das echte Leben ist 0, also sitzt jede Karte sicher (wie im Gewächshaus). */
 export function defeated(b: Battle): boolean {
-  return Math.round(b.real) === 0
+  return b.real < LIFE_EPSILON
 }

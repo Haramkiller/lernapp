@@ -44,6 +44,14 @@ describe('battle', () => {
     expect(defeated(b)).toBe(true)
   })
 
+  it('fast sicher ist nicht besiegt: Anzeige bleibt bei 1, kein „endgültig besiegt“', () => {
+    // Letzte offene Karte endet bei Stabilität 6,8 Tagen: Leben ≈ 0,29, gerundet wäre es 0.
+    const b = applyAnswer(startBattle(1, { hp: 10, max: 30 }), { ...R, before: 10, after: 0.29 }, never)
+    expect(b.hp).toBe(1)
+    expect(b.last!.damage).toBe(9)
+    expect(defeated(b)).toBe(false)
+  })
+
   it('Combo, Krit und Glück ändern den Schaden nicht', () => {
     const b = applyAnswer(startBattle(3, L), { ...R, elapsedDays: 7 }, () => 0.05)
     expect(b.last).toMatchObject({ damage: 6, crit: true, lucky: true })

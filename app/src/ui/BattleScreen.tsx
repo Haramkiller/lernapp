@@ -5,7 +5,7 @@ import { loadSettings } from '../data/settings'
 import { recordReview } from '../data/sync'
 import { LUCKY_CHANCE, RESTED_LUCKY_CHANCE, applyAnswer, defeated, endBattle, hpPercent, startBattle, type Battle } from '../game/battle'
 import { bossFor, type AreaChoices } from '../game/bosses'
-import { bossLife, cardLife, isPlayable } from '../game/mastery'
+import { bossLife, cardLife, isPlayable, shownLife } from '../game/mastery'
 import { ALL_MODULES, loadAreaChoices, loadBossLife, saveBossLife } from '../data/game'
 import { buildQueue, newDoneKey, type Settings } from '../session/queue'
 import { toRating, type Outcome } from '../srs/grading'
@@ -110,7 +110,7 @@ export function BattleScreen({
         setCards(ids.map((id) => byId.get(id)!))
         // Boss-Leben über alle abfragbaren Karten im Umfang, nicht nur über die heutige Lernliste.
         const life = bossLife(valid, map, t, s.retention)
-        const shown = Math.round(life.hp)
+        const shown = shownLife(life.hp)
         setRecovery(saved !== null && shown - saved >= 1 ? { from: saved, to: shown } : null)
         setBattle(startBattle(ids.length, life))
       } catch (e) {

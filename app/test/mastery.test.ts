@@ -97,6 +97,9 @@ describe('Boss-Leben', () => {
   it('lifePercent: null ohne Karten, sonst gerundet', () => {
     expect(lifePercent({ hp: 0, max: 0 })).toBeNull()
     expect(lifePercent({ hp: 13.4, max: 20 })).toBe(67)
+    // Nur wirklich besiegt zeigt 0 %.
+    expect(lifePercent({ hp: 0.3, max: 300 })).toBe(1)
+    expect(lifePercent({ hp: 0, max: 300 })).toBe(0)
   })
 })
 
