@@ -46,6 +46,15 @@ function fakeClient(initial: GetSession) {
 }
 
 const retryable = () => new AuthRetryableFetchError('Failed to fetch', 0)
+/** Überschrift der Willkommensseite (abgemeldeter Start). */
+const WELCOME = 'Willkommen bei Lernabenteuer'
+/** Willkommensseite → „Ich bin neu“ → Konto anlegen ausfüllen und absenden. */
+async function signUpAs(email: string, password: string) {
+  await userEvent.click(await screen.findByRole('button', { name: 'Ich bin neu' }))
+  await userEvent.type(screen.getByLabelText('E-Mail'), email)
+  await userEvent.type(screen.getByLabelText('Passwort'), password)
+  await userEvent.click(screen.getByRole('button', { name: 'Konto anlegen' }))
+}
 /** Erster Bildschirm nach der Anmeldung: das Titelbild. */
 const home = () => screen.findByRole('button', { name: "Los geht's" })
 /** Titelbild → Gewächshaus → Menü. */
@@ -67,7 +76,7 @@ describe('App: Offline-Start', () => {
     expect(await home()).toBeInTheDocument()
     // INITIAL_SESSION mit null darf nicht nachträglich zur Anmeldung wechseln
     await act(async () => {})
-    expect(screen.queryByRole('heading', { name: 'Anmelden' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: WELCOME })).not.toBeInTheDocument()
   })
 
   it('Gerät offline + Netzfehler beim Auffrischen: Übersicht mit Offline-Hinweis', async () => {
@@ -85,28 +94,28 @@ describe('App: Offline-Start', () => {
     await saveSignedInMarker({ url: URL_A, userId: 'u1' })
     const { client } = fakeClient({ data: { session: null }, error: null })
     render(<App env={env} makeClient={() => client} />)
-    expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: WELCOME })).toBeInTheDocument()
   })
 
   it('endgültig ungültige Sitzung (online, kein Netzfehler): Anmeldung', async () => {
     await saveSignedInMarker({ url: URL_A, userId: 'u1' })
     const { client } = fakeClient({ data: { session: null }, error: new AuthApiError('Invalid Refresh Token', 400, 'refresh_token_not_found') })
     render(<App env={env} makeClient={() => client} />)
-    expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: WELCOME })).toBeInTheDocument()
   })
 
   it('online ohne Sitzung: Anmeldung und veraltete Anmeldemarke wird gelöscht', async () => {
     await saveSignedInMarker({ url: URL_A, userId: 'u1' })
     const { client } = fakeClient({ data: { session: null }, error: null })
     render(<App env={env} makeClient={() => client} />)
-    expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: WELCOME })).toBeInTheDocument()
     await vi.waitFor(async () => expect(await db.meta.get('signedIn')).toBeUndefined())
   })
 
   it('Netzfehler, aber nie angemeldet: Anmeldung', async () => {
     const { client } = fakeClient({ data: { session: null }, error: retryable() })
     render(<App env={env} makeClient={() => client} />)
-    expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: WELCOME })).toBeInTheDocument()
   })
 
   it('scheitert das Auffrischen später endgültig (SIGNED_OUT): Anmeldung', async () => {
@@ -115,7 +124,7 @@ describe('App: Offline-Start', () => {
     render(<App env={env} makeClient={() => client} />)
     await home()
     emit('SIGNED_OUT', null)
-    expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: WELCOME })).toBeInTheDocument()
     expect(await db.meta.get('signedIn')).toBeUndefined()
   })
 
@@ -137,17 +146,42 @@ describe('App: Abmelden', () => {
     await openMenu()
     await userEvent.click(await screen.findByRole('button', { name: 'Einstellungen' }))
     await userEvent.click(await screen.findByRole('button', { name: 'Abmelden' }))
-    expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: WELCOME })).toBeInTheDocument()
     expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' })
     expect(await db.meta.get('signedIn')).toBeUndefined()
 
     emit('TOKEN_REFRESHED', session('u1'))
     await act(async () => {})
     await new Promise((r) => setTimeout(r, 50))
-    expect(screen.getByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: WELCOME })).toBeInTheDocument()
 
     emit('SIGNED_IN', session('u1'))
     expect(await home()).toBeInTheDocument()
+  })
+})
+
+describe('App: Registrierung', () => {
+  it('Registrierung ohne Bestätigung meldet direkt an', async () => {
+    const { client, auth, emit } = fakeClient({ data: { session: null }, error: null })
+    auth.signUp.mockImplementation(async () => {
+      // auth-js meldet die neue Sitzung über onAuthStateChange
+      queueMicrotask(() => void emit('SIGNED_IN', session('u1')))
+      return { data: { session: session('u1'), user: { id: 'u1' } }, error: null }
+    })
+    render(<App env={env} makeClient={() => client} />)
+    await signUpAs('a@b.de', 'geheim1')
+    expect(auth.signUp).toHaveBeenCalledWith({ email: 'a@b.de', password: 'geheim1' })
+    expect(await home()).toBeInTheDocument()
+    expect(screen.queryByText('Schritt 2 von 3')).not.toBeInTheDocument()
+  })
+
+  it('Registrierung mit Bestätigung zeigt Schritt 2', async () => {
+    const { client, auth } = fakeClient({ data: { session: null }, error: null })
+    auth.signUp.mockImplementation(async () => ({ data: { session: null, user: { id: 'u1' } }, error: null }))
+    render(<App env={env} makeClient={() => client} />)
+    await signUpAs('a@b.de', 'geheim1')
+    expect(await screen.findByText('Schritt 2 von 3')).toBeInTheDocument()
+    expect(screen.getByText(/a@b\.de/)).toBeInTheDocument()
   })
 })
 
@@ -158,11 +192,11 @@ describe('App: Kontowechsel', () => {
     const confirm = vi.fn(() => false)
     const { client, auth, emit } = fakeClient({ data: { session: null }, error: null })
     render(<App env={env} makeClient={() => client} confirm={confirm} />)
-    await screen.findByRole('heading', { name: 'Anmelden' })
+    await screen.findByRole('heading', { name: WELCOME })
     emit('SIGNED_IN', session('u2'))
     await vi.waitFor(() => expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' }))
     expect(confirm).toHaveBeenCalledTimes(1)
-    expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: WELCOME })).toBeInTheDocument()
     expect(await db.outbox.count()).toBe(1)
   })
 
@@ -172,7 +206,7 @@ describe('App: Kontowechsel', () => {
     await db.outbox.add({ kind: 'log', payload: { id: 'l', cardId: 'c1', rating: 3, reviewedAt: 'r', studyDay: 'd', elapsedDays: 0 } })
     const { client, emit } = fakeClient({ data: { session: null }, error: null })
     render(<App env={env} makeClient={() => client} confirm={() => true} />)
-    await screen.findByRole('heading', { name: 'Anmelden' })
+    await screen.findByRole('heading', { name: WELCOME })
     emit('SIGNED_IN', session('u2'))
     expect(await home()).toBeInTheDocument()
     expect(await db.outbox.count()).toBe(0)
@@ -202,10 +236,10 @@ describe('App: keine Sitzung aus der URL (Login-CSRF)', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     render(<App env={env} />) // ohne makeClient: der Client, den die App wirklich baut
-    expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: WELCOME })).toBeInTheDocument()
     await act(async () => {})
     await new Promise((r) => setTimeout(r, 50))
-    expect(screen.getByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: WELCOME })).toBeInTheDocument()
     expect(fetchMock.mock.calls.some(([input]) => String(input instanceof Request ? input.url : input).includes('/auth/v1/user'))).toBe(false)
     expect(await db.meta.get('owner')).toBeUndefined()
   })
@@ -222,7 +256,7 @@ describe('App: eigene Datenbank vor der Anmeldung', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Eigene Datenbank verwenden' }))
     expect(screen.getByRole('heading', { name: 'Einrichtung' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Zurück' }))
-    expect(screen.getByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: WELCOME })).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'Eigene Datenbank verwenden' }))
     await userEvent.type(screen.getByLabelText('Supabase-URL'), 'https://b.supabase.co')
@@ -230,7 +264,7 @@ describe('App: eigene Datenbank vor der Anmeldung', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }))
     // Erst auf den neuen Client warten: Vorher zeigt die App kurz noch die alte Anmeldeseite bzw. „Lade …“.
     await vi.waitFor(() => expect(made.at(-1)).toBe('https://b.supabase.co'))
-    expect(await screen.findByRole('heading', { name: 'Anmelden' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: WELCOME })).toBeInTheDocument()
     expect(await loadOverride()).toEqual({ url: 'https://b.supabase.co', key: 'anon-b' })
   }, 15_000) // tippt viele Zeichen einzeln; unter Last (CI) reichen die 5 s Standard nicht
 
@@ -248,7 +282,7 @@ describe('App: eigene Datenbank vor der Anmeldung', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Eingebaute Datenbank verwenden' }))
     // Erst auf den neuen Client warten, dann auf die Anmeldeseite (unter Last dauert der Wechsel länger als 1 s).
     await vi.waitFor(() => expect(made.at(-1)).toBe(URL_A), { timeout: 5_000 })
-    expect(await screen.findByRole('heading', { name: 'Anmelden' }, { timeout: 5_000 })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: WELCOME }, { timeout: 5_000 })).toBeInTheDocument()
     expect(await loadOverride()).toBeNull()
   })
 })

@@ -12,7 +12,8 @@ import { InstallHint } from './ui/InstallHint'
 import { CampScreen, type SyncStatus } from './ui/CampScreen'
 import { GreenhouseScreen } from './ui/GreenhouseScreen'
 import { TitleScreen } from './ui/TitleScreen'
-import { LoginScreen, type AuthMode } from './ui/LoginScreen'
+import type { AuthMode, AuthResult } from './ui/LoginScreen'
+import { WelcomeFlow } from './ui/WelcomeFlow'
 import { SettingsScreen } from './ui/SettingsScreen'
 import { SetupScreen } from './ui/SetupScreen'
 import { BattleScreen } from './ui/BattleScreen'
@@ -150,7 +151,7 @@ export function App({ env = defaultEnv, makeClient = createAppClient, confirm = 
 
   const getTicket = useCallback(async () => (client ? createAskTicket(client) : null), [client])
 
-  const authenticate = async (mode: AuthMode, email: string, password: string): Promise<string | void> => {
+  const authenticate = async (mode: AuthMode, email: string, password: string): Promise<AuthResult> => {
     if (!client) return
     if (mode === 'signIn') {
       const { error } = await client.auth.signInWithPassword({ email, password })
@@ -159,7 +160,8 @@ export function App({ env = defaultEnv, makeClient = createAppClient, confirm = 
     }
     const { data, error } = await client.auth.signUp({ email, password })
     if (error) throw error
-    if (!data.session) return 'Fast geschafft: Bestätige deine E-Mail-Adresse über den Link in der Nachricht und melde dich dann an.'
+    // Ohne Sitzung muss die E-Mail erst bestätigt werden (WelcomeFlow zeigt Schritt 2).
+    if (!data.session) return 'confirm'
   }
 
   if (config === undefined) return <main className="app"><p className="muted">Lade …</p></main>
@@ -193,7 +195,7 @@ export function App({ env = defaultEnv, makeClient = createAppClient, confirm = 
   if (!signedIn) {
     return (
       <main className="app">
-        <LoginScreen onSubmit={authenticate} database={override?.url} onUseOwnDatabase={() => setSetupOpen(true)} />
+        <WelcomeFlow onSubmit={authenticate} database={override?.url} onUseOwnDatabase={() => setSetupOpen(true)} />
       </main>
     )
   }
