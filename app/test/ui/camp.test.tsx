@@ -152,6 +152,13 @@ describe('CampScreen', () => {
     expect(onSettings).toHaveBeenCalled()
   })
 
+  it('Knopf „Gewächshaus“ führt ins Gewächshaus', async () => {
+    const onGreenhouse = vi.fn()
+    camp({ onGreenhouse })
+    await userEvent.click(await screen.findByRole('button', { name: 'Gewächshaus' }))
+    expect(onGreenhouse).toHaveBeenCalled()
+  })
+
   it('Ladefehler mit „Erneut versuchen“', async () => {
     const spy = vi.spyOn(db.cards, 'toArray').mockRejectedValue(new Error('DB gesperrt'))
     camp()

@@ -7,6 +7,7 @@ import { isRested, minutesUntilRested } from '../game/rest'
 import { CAMP, fireFrames } from '../game/scenes'
 import { newDoneKey } from '../session/queue'
 import { MapDialog } from './game/MapDialog'
+import { SceneMenu } from './game/SceneMenu'
 import { Sprite } from './game/Sprite'
 
 export type SyncStatus =
@@ -24,6 +25,7 @@ type Props = {
   onBattle: (moduleId: string | undefined, rested: boolean) => void
   onSettings: () => void
   onSyncNow?: () => void
+  onGreenhouse?: () => void
 }
 
 type Data = { overview: Overview; dead: number; lastBattleAt: Date | null }
@@ -60,12 +62,11 @@ export async function loadOverview(t: Date): Promise<Data> {
   return { overview: buildOverview({ cards, states, topics, modules, newDoneToday, now: t, settings, chosen }), dead, lastBattleAt }
 }
 
-export function CampScreen({ now = () => new Date(), sync, refreshKey = 0, onBattle, onSettings, onSyncNow }: Props) {
+export function CampScreen({ now = () => new Date(), sync, refreshKey = 0, onBattle, onSettings, onSyncNow, onGreenhouse }: Props) {
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [retry, setRetry] = useState(0)
   const [mapOpen, setMapOpen] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
   const [, setTick] = useState(0)
   const fire = useRef<HTMLButtonElement>(null)
   /** Alles hinter der Karte; bei offener Karte `inert` (kein Tab, kein Vorlesen dahinter). */
@@ -151,29 +152,16 @@ export function CampScreen({ now = () => new Date(), sync, refreshKey = 0, onBat
             <span className="fire-glow" aria-hidden="true" />
             <Sprite frames={fireFrames()} fps={f.fps} />
           </button>
-          <button type="button" className="scene-menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
-            Menü
-          </button>
+          <SceneMenu sync={sync} dead={data.dead} onSettings={onSettings} onSyncNow={onSyncNow} />
           <p className="scene-hint">
             {rested ? 'Ausgeruht · tippe aufs Feuer für die Karte' : `Pause am Feuer: noch ${minutesUntilRested(data.lastBattleAt, t)} min bis Ausgeruht`}
           </p>
+          {onGreenhouse && (
+            <button type="button" className="scene-go" onClick={onGreenhouse}>
+              Gewächshaus
+            </button>
+          )}
         </div>
-        {menuOpen && (
-          <div className="camp-menu card-panel">
-            <p className={`sync ${sync.kind}`}>{syncText(sync)}</p>
-            {data.dead > 0 && <p className="warn">{`${data.dead} Einträge konnten nicht synchronisiert werden`}</p>}
-            <div className="row">
-              {onSyncNow && (
-                <button type="button" onClick={onSyncNow}>
-                  Jetzt synchronisieren
-                </button>
-              )}
-              <button type="button" onClick={onSettings}>
-                Einstellungen
-              </button>
-            </div>
-          </div>
-        )}
         {data.overview.strays > 0 && (
           <div className="row strays">
             <span>{`Verirrte Karten: ${data.overview.strays}`}</span>

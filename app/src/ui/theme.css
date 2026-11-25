@@ -671,7 +671,7 @@ button.module {
   font-size: 0.85rem;
   text-align: left;
 }
-.camp-menu .sync {
+.scene-menu-panel .sync {
   margin-top: 0;
 }
 .strays {
@@ -1218,4 +1218,163 @@ button.cta:disabled {
   .order-list li {
     transition: none;
   }
+}
+
+/* Gewächshaus (Teil 3) und gemeinsame Szenen-Bausteine */
+.greenhouse {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.scene-backdrop.mirror {
+  transform: scaleX(-1);
+}
+.scene-menu-panel {
+  position: absolute;
+  z-index: 6;
+  top: 56px;
+  right: 10px;
+  left: 10px;
+  margin: 0;
+}
+.scene-go {
+  position: absolute;
+  top: 64px;
+  left: 10px;
+  background: rgba(20, 18, 31, 0.85);
+}
+.scene-where {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 6px 10px;
+  border: 2px solid #000;
+  border-radius: 8px;
+  background: rgba(20, 18, 31, 0.85);
+  font-family: var(--pixel);
+  font-size: 9px;
+}
+.plant {
+  position: absolute;
+  aspect-ratio: 1;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  transform: translate(-50%, -100%);
+  cursor: pointer;
+}
+.plant img,
+.tree {
+  display: block;
+  width: 100%;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.4));
+}
+.tree {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+}
+.plant:hover img,
+.plant:focus-visible img {
+  filter: drop-shadow(0 0 4px var(--accent));
+}
+.plant:focus-visible {
+  outline: none;
+}
+.bed-sign {
+  position: absolute;
+  transform: translateX(-50%);
+  max-width: 44%;
+  padding: 3px 6px;
+  overflow: hidden;
+  border: 2px solid #3b2a14;
+  border-radius: 4px;
+  background: #c9a46a;
+  box-shadow: 0 3px 0 #3b2a14;
+  color: #3b2a14;
+  font-family: var(--pixel);
+  font-size: 7px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.bed-sign.near {
+  max-width: 70%;
+  padding: 5px 9px;
+  font-size: 9px;
+}
+.bed-pager {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  justify-content: space-between;
+}
+.bed-pager button {
+  min-height: 40px;
+  background: rgba(20, 18, 31, 0.85);
+}
+.plant-sign {
+  position: absolute;
+  z-index: 5;
+  top: 40%;
+  left: 50%;
+  width: 80%;
+  margin: 0;
+  padding: 10px 12px;
+  transform: translateX(-50%);
+  border: 2px solid #000;
+  border-radius: 12px;
+  background: rgba(20, 18, 31, 0.94);
+  text-align: center;
+  font-size: 0.9rem;
+}
+.insect {
+  position: absolute;
+  width: 6%;
+  pointer-events: none;
+  animation: insect-fly 9s ease-in-out infinite;
+}
+.insect.bee {
+  width: 4.5%;
+  animation-duration: 6s;
+}
+.insect .sprite {
+  display: block;
+  width: 100%;
+}
+@keyframes insect-fly {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(40%, -60%); }
+  50% { transform: translate(120%, 10%); }
+  75% { transform: translate(30%, 70%); }
+  100% { transform: translate(0, 0); }
+}
+.garden-nav {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+}
+.garden-nav button {
+  min-height: 52px;
+  border: 2px solid #000;
+  border-bottom-width: 5px;
+  border-radius: 12px;
+}
+.garden-nav .nav-back {
+  grid-column: 2;
+}
+@media (prefers-reduced-motion: reduce) {
+  .insect {
+    animation: none;
+  }
+}
+.greenhouse > .center {
+  margin: 0;
+  text-align: center;
 }
