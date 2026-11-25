@@ -6,6 +6,9 @@ const AREA = 'area:'
 const REST = 'rest'
 const TOPIC = 'topic:'
 const BOSS = 'boss:'
+const LIFE = 'life:'
+/** Schlüssel für das Boss-Leben eines Kampfes über alle Module. */
+export const ALL_MODULES = '*'
 
 /** Speichert lokal und legt den Eintrag für den nächsten Sync in die Outbox (in einer Transaktion). */
 export async function putGameItem(item: GameItem): Promise<void> {
@@ -34,6 +37,16 @@ export async function loadLastBattleAt(): Promise<Date | null> {
 
 export async function saveLastBattleAt(at: Date): Promise<void> {
   await putGameItem({ id: REST, data: { at: at.toISOString() }, updatedAt: at.toISOString() })
+}
+
+/** Zuletzt angezeigtes Boss-Leben am Kampfende (für „hat sich erholt“); null ohne Eintrag. */
+export async function loadBossLife(key: string): Promise<number | null> {
+  const hp = (await db.game.get(LIFE + key))?.data.hp
+  return typeof hp === 'number' ? hp : null
+}
+
+export async function saveBossLife(key: string, hp: number, now: Date): Promise<void> {
+  await putGameItem({ id: LIFE + key, data: { hp }, updatedAt: now.toISOString() })
 }
 
 /** Gewächshaus: wann ein Thema erstmals sicher saß bzw. ein Modul erstmals ganz blühte. */

@@ -13,7 +13,8 @@ import { choiceCard, pick } from './fixtures'
 import { newDoneKey } from '../../src/session/queue'
 import { newSrsState, review } from '../../src/srs/scheduler'
 import { BOSSES, bossFor } from '../../src/game/bosses'
-import { saveAreaChoice } from '../../src/data/game'
+import { loadBossLife, saveAreaChoice, saveBossLife } from '../../src/data/game'
+import { cardLife } from '../../src/game/mastery'
 
 const NOW = new Date('2026-03-10T10:00:00.000Z')
 
@@ -38,7 +39,8 @@ describe('BattleScreen', () => {
     expect(screen.getByText(/5 falsch/)).toBeInTheDocument()
     expect(screen.getByText(/Pause/)).toBeInTheDocument()
     expect(await db.states.count()).toBe(25)
-    expect(await db.outbox.count()).toBe(50)
+    // 25 States + 25 Logs + das gespeicherte Endleben des Bosses
+    await vi.waitFor(async () => expect(await db.outbox.count()).toBe(51))
     expect(onFinished).toHaveBeenCalledTimes(1)
   })
 
@@ -110,6 +112,12 @@ describe('BattleScreen: Kampf', () => {
   const right = async () => pick(await screen.findByRole('button', { name: /Richtig B/ }))
   const wrong = async () => pick(await screen.findByRole('button', { name: /Falsch A/ }))
   const next = async () => userEvent.click(await screen.findByRole('button', { name: 'Weiter' }))
+  /** Angezeigtes Leben „hp / max“ neben der Leiste. */
+  const hpText = () => {
+    const m = /^(\d+) \/ (\d+)$/.exec(document.querySelector('.hp-text')?.textContent ?? '')
+    return m ? [Number(m[1]), Number(m[2])] : null
+  }
+  const DAY_MS = 24 * 60 * 60_000
 
   afterEach(() => vi.unstubAllGlobals())
 
@@ -132,6 +140,16 @@ describe('BattleScreen: Kampf', () => {
     render(<BattleScreen moduleId="m1" now={() => NOW} rng={NO_LUCK} onExit={vi.fn()} />)
     expect(await screen.findByRole('heading', { name: /· Botanik$/ })).toBeInTheDocument()
     expect(bar()).toHaveAttribute('aria-valuenow', '100')
+    expect(hpText()).toEqual([20, 20])
+  })
+
+  it('neue Karten machen den Boss stärker: Leben über das ganze Modul', async () => {
+    await db.meta.put({ key: 'settings', value: { retention: 0.9, newPerDay: 40 } })
+    await cards(30)
+    render(<BattleScreen now={() => NOW} rng={NO_LUCK} onExit={vi.fn()} />)
+    await screen.findByRole('button', { name: /Richtig B/ })
+    expect(hpText()).toEqual([300, 300])
+    expect(screen.getByText(/1 \/ 25/)).toBeInTheDocument()
   })
 
   it('kämpft gegen den Boss des gewählten Gebiets (wie auf der Karte)', async () => {
@@ -145,18 +163,21 @@ describe('BattleScreen: Kampf', () => {
     expect(await screen.findByRole('heading', { name: `${chosen.title} · Botanik` })).toBeInTheDocument()
   })
 
-  it('richtige Antwort senkt das Leben, falsche lässt den Boss angreifen', async () => {
+  it('richtige Antwort senkt das Leben ehrlich, falsche lässt es stehen', async () => {
     await botanik()
     await cards(4)
     const { container } = render(<BattleScreen moduleId="m1" now={() => NOW} rng={NO_LUCK} onExit={vi.fn()} />)
     await right()
-    await vi.waitFor(() => expect(bar()).toHaveAttribute('aria-valuenow', '75'))
-    expect(container.querySelector('.fx-damage')).toHaveTextContent('-10')
+    await vi.waitFor(() => expect(Number(bar().getAttribute('aria-valuenow'))).toBeLessThan(100))
+    const [hp] = hpText()!
+    expect(hp).toBeLessThan(40)
+    expect(container.querySelector('.fx-damage')).toHaveTextContent(`-${40 - hp!}`)
     await next()
     await wrong()
     // Die Antwort zählt erst nach dem Speichern: auf den Angriff warten, nicht sofort prüfen (CI ist langsamer).
     await vi.waitFor(() => expect(container.querySelector('.arena')).toHaveClass('boss-attacks'))
-    expect(bar()).toHaveAttribute('aria-valuenow', '75')
+    expect(hpText()![0]).toBe(hp)
+    expect(container.querySelector('.fx-damage')).toBeNull()
     expect(screen.queryByText(/Herz|Leben verloren/)).not.toBeInTheDocument()
   })
 
@@ -181,27 +202,105 @@ describe('BattleScreen: Kampf', () => {
     expect(screen.getByText('Kritisch!')).toBeInTheDocument()
   })
 
-  it('alle Fragen richtig: „Besiegt!“ mit Zahlen und Pausenhinweis', async () => {
+  it('Abschluss zeigt vorher → nachher', async () => {
     await cards(2)
     render(<BattleScreen now={() => NOW} rng={NO_LUCK} onExit={vi.fn()} />)
     await right()
     await next()
     await right()
     await next()
-    expect(await screen.findByRole('heading', { name: 'Besiegt!' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Geschwächt' })).toBeInTheDocument()
+    expect(screen.getByText(/^20 → \d+$/)).toBeInTheDocument()
+    expect(screen.getByText(/Leben in dieser Runde/)).toBeInTheDocument()
+    expect(screen.getByText(/^Noch \d+ %$/)).toBeInTheDocument()
     expect(screen.getByText(/2 richtig, 0 teilweise, 0 falsch/)).toBeInTheDocument()
     expect(screen.getByText('Höchste Combo: 2')).toBeInTheDocument()
     expect(screen.getByText(/Pause/)).toBeInTheDocument()
+    expect(screen.queryByText(/sitzt jetzt sicher|sitzen jetzt sicher/)).not.toBeInTheDocument()
   })
 
-  it('Beenden mitten im Kampf: „Geflohen“, onFinished einmal', async () => {
+  it('Endgültig besiegt, wenn das Modul danach ganz sicher sitzt', async () => {
+    await cards(1)
+    const earlier = new Date(NOW.getTime() - 40 * DAY_MS)
+    const base = review(newSrsState(earlier), 4, earlier, { cardId: 'k0' }).state
+    const faded = { ...base, stability: 30, last_review: earlier.toISOString(), due: new Date(NOW.getTime() - 10 * DAY_MS).toISOString() }
+    expect(cardLife(faded, NOW, 0.9)).toBeGreaterThan(0)
+    expect(cardLife(review(faded, 3, NOW, { cardId: 'k0' }).state, NOW, 0.9)).toBe(0)
+    await db.states.put({ cardId: 'k0', state: faded, updatedAt: earlier.toISOString() })
+    render(<BattleScreen now={() => NOW} rng={NO_LUCK} onExit={vi.fn()} />)
+    await right()
+    await next()
+    expect(await screen.findByRole('heading', { name: 'Endgültig besiegt!' })).toBeInTheDocument()
+    expect(screen.getByText('1 Karte sitzt jetzt sicher')).toBeInTheDocument()
+  })
+
+  it('Erholung beim Start: Meldung bis zur ersten Antwort', async () => {
+    await botanik()
+    await cards(2)
+    await saveBossLife('m1', 15, NOW)
+    const title = bossFor('m1', [{ id: 'm1', name: 'Botanik' }]).boss.title
+    render(<BattleScreen moduleId="m1" now={() => NOW} rng={NO_LUCK} onExit={vi.fn()} />)
+    expect(await screen.findByText(`${title} hat sich erholt: 15 → 20`)).toBeInTheDocument()
+    await right()
+    await screen.findByRole('button', { name: 'Weiter' })
+    expect(screen.queryByText(/hat sich erholt/)).not.toBeInTheDocument()
+  })
+
+  it('keine Erholungsmeldung ohne gespeichertes Leben oder bei weniger als 1', async () => {
+    await botanik()
+    await cards(2)
+    render(<BattleScreen moduleId="m1" now={() => NOW} rng={NO_LUCK} onExit={vi.fn()} />)
+    await screen.findByRole('button', { name: /Richtig B/ })
+    expect(screen.queryByText(/hat sich erholt/)).not.toBeInTheDocument()
+  })
+
+  it('keine Erholungsmeldung, wenn das gespeicherte Leben gleich ist', async () => {
+    await botanik()
+    await cards(2)
+    await saveBossLife('m1', 20, NOW)
+    render(<BattleScreen moduleId="m1" now={() => NOW} rng={NO_LUCK} onExit={vi.fn()} />)
+    await screen.findByRole('button', { name: /Richtig B/ })
+    expect(screen.queryByText(/hat sich erholt/)).not.toBeInTheDocument()
+  })
+
+  it('Kampfende speichert das angezeigte Endleben (Modul und „alle“ getrennt)', async () => {
+    await botanik()
+    await cards(1)
+    render(<BattleScreen moduleId="m1" now={() => NOW} rng={NO_LUCK} onExit={vi.fn()} />)
+    await right()
+    await next()
+    const end = Number(/→ (\d+)$/.exec((await screen.findByText(/^10 → \d+$/)).textContent!)![1])
+    await vi.waitFor(async () => expect(await loadBossLife('m1')).toBe(end))
+    expect(await loadBossLife('*')).toBeNull()
+  })
+
+  it('Kampf ohne Modul speichert unter „*“', async () => {
+    await cards(1)
+    render(<BattleScreen now={() => NOW} rng={NO_LUCK} onExit={vi.fn()} />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Beenden' }))
+    await vi.waitFor(async () => expect(await loadBossLife('*')).toBe(10))
+  })
+
+  it('Speichern des Endlebens schlägt fehl: Abschluss erscheint trotzdem', async () => {
+    await cards(1)
+    const spy = vi.spyOn(db.game, 'put').mockRejectedValue(new Error('voll'))
+    render(<BattleScreen now={() => NOW} rng={NO_LUCK} onExit={vi.fn()} />)
+    await right()
+    await next()
+    expect(await screen.findByRole('heading', { name: 'Geschwächt' })).toBeInTheDocument()
+    await vi.waitFor(() => expect(spy).toHaveBeenCalled())
+    spy.mockRestore()
+  })
+
+  it('Beenden mitten im Kampf: „Geschwächt“, onFinished einmal', async () => {
     await cards(3)
     const onFinished = vi.fn()
     render(<BattleScreen now={() => NOW} rng={NO_LUCK} onFinished={onFinished} onExit={vi.fn()} />)
     await right()
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Beenden' })).toBeEnabled())
     await userEvent.click(screen.getByRole('button', { name: 'Beenden' }))
-    expect(await screen.findByRole('heading', { name: 'Geflohen' })).toBeInTheDocument()
-    expect(screen.getByText('Er flieht mit 67 % Leben.')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Geschwächt' })).toBeInTheDocument()
+    expect(screen.getByText(/^30 → \d+$/)).toBeInTheDocument()
     expect(screen.getByText(/1 richtig, 0 teilweise, 0 falsch/)).toBeInTheDocument()
     expect(onFinished).toHaveBeenCalledTimes(1)
   })
@@ -233,11 +332,13 @@ describe('BattleScreen: Kampf', () => {
     await vi.waitFor(() => expect(onFinished).toHaveBeenCalledWith(1))
   })
 
-  it('Beenden ohne Antwort: onFinished mit 0', async () => {
+  it('Beenden ohne Antwort: „Hält stand“, onFinished mit 0', async () => {
     await cards(3)
     const onFinished = vi.fn()
     render(<BattleScreen now={() => NOW} rng={NO_LUCK} onFinished={onFinished} onExit={vi.fn()} />)
     await userEvent.click(await screen.findByRole('button', { name: 'Beenden' }))
+    expect(await screen.findByRole('heading', { name: 'Hält stand' })).toBeInTheDocument()
+    expect(screen.queryByText(/Leben in dieser Runde/)).not.toBeInTheDocument()
     await vi.waitFor(() => expect(onFinished).toHaveBeenCalledWith(0))
   })
 
@@ -248,6 +349,7 @@ describe('BattleScreen: Kampf', () => {
     await right()
     expect(await screen.findByRole('alert')).toHaveTextContent(/nicht gespeichert/)
     expect(bar()).toHaveAttribute('aria-valuenow', '100')
+    expect(hpText()).toEqual([20, 20])
     spy.mockRestore()
   })
 
@@ -281,7 +383,7 @@ describe('BattleScreen: Kampf', () => {
     await cards(2)
     render(<BattleScreen now={() => NOW} rng={NO_LUCK} onExit={vi.fn()} />)
     await right()
-    await vi.waitFor(() => expect(bar()).toHaveAttribute('aria-valuenow', '50'))
+    await vi.waitFor(() => expect(Number(bar().getAttribute('aria-valuenow'))).toBeLessThan(100))
   })
 })
 

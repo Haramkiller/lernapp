@@ -1,7 +1,17 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from '../src/data/db'
-import { loadAreaChoices, loadLastBattleAt, loadMilestones, recordMilestones, saveAreaChoice, saveLastBattleAt } from '../src/data/game'
+import {
+  ALL_MODULES,
+  loadAreaChoices,
+  loadBossLife,
+  loadLastBattleAt,
+  loadMilestones,
+  recordMilestones,
+  saveAreaChoice,
+  saveBossLife,
+  saveLastBattleAt,
+} from '../src/data/game'
 import { newMilestones, type BedView } from '../src/game/garden'
 
 const T1 = new Date('2026-03-10T10:00:00Z')
@@ -18,6 +28,17 @@ describe('Spieldaten', () => {
     const box = await db.outbox.toArray()
     expect(box).toHaveLength(1)
     expect(box[0]).toMatchObject({ kind: 'game', payload: { id: 'area:m1', data: { bossId: 'sporenhexe' }, updatedAt: T1.toISOString() } })
+  })
+
+  it('Boss-Leben: ohne Eintrag null; speichern, laden, Outbox; je Modul getrennt', async () => {
+    expect(await loadBossLife('m1')).toBeNull()
+    await saveBossLife('m1', 280, T1)
+    await saveBossLife(ALL_MODULES, 12, T2)
+    expect(await loadBossLife('m1')).toBe(280)
+    expect(await loadBossLife(ALL_MODULES)).toBe(12)
+    expect(ALL_MODULES).toBe('*')
+    const box = await db.outbox.toArray()
+    expect(box[0]).toMatchObject({ kind: 'game', payload: { id: 'life:m1', data: { hp: 280 }, updatedAt: T1.toISOString() } })
   })
 
   it('„automatisch“ entfernt die Wahl', async () => {

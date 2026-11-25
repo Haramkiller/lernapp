@@ -3,10 +3,10 @@ import type { Card, Module } from '@lernapp/shared'
 import { db } from '../data/db'
 import { loadSettings } from '../data/settings'
 import { recordReview } from '../data/sync'
-import { LUCKY_CHANCE, RESTED_LUCKY_CHANCE, applyAnswer, endBattle, hpPercent, startBattle, type Battle } from '../game/battle'
+import { LUCKY_CHANCE, RESTED_LUCKY_CHANCE, applyAnswer, defeated, endBattle, hpPercent, startBattle, type Battle } from '../game/battle'
 import { bossFor, type AreaChoices } from '../game/bosses'
-import { isPlayable } from '../game/mastery'
-import { loadAreaChoices } from '../data/game'
+import { bossLife, cardLife, isPlayable } from '../game/mastery'
+import { ALL_MODULES, loadAreaChoices, loadBossLife, saveBossLife } from '../data/game'
 import { buildQueue, newDoneKey, type Settings } from '../session/queue'
 import { toRating, type Outcome } from '../srs/grading'
 import { newSrsState, review, type SrsState } from '../srs/scheduler'
@@ -40,6 +40,7 @@ type Props = {
 }
 
 type Counts = Record<Outcome, number>
+type Recovery = { from: number; to: number }
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
@@ -66,6 +67,7 @@ export function BattleScreen({
   const [result, setResult] = useState<{ outcome: Outcome; answer: Answer } | null>(null)
   const [counts, setCounts] = useState<Counts>({ right: 0, partial: 0, wrong: 0 })
   const [battle, setBattle] = useState<Battle | null>(null)
+  const [recovery, setRecovery] = useState<Recovery | null>(null)
   const [turn, setTurn] = useState(0)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -77,6 +79,7 @@ export function BattleScreen({
   const settings = useRef<Settings | null>(null)
   const busy = useRef(false)
   const finished = useRef(false)
+  const lifeKey = moduleId ?? ALL_MODULES
 
   useEffect(() => {
     let cancelled = false
@@ -84,12 +87,13 @@ export function BattleScreen({
     setCards(null)
     void (async () => {
       try {
-        const [all, rows, s, mods, chosen] = await Promise.all([
+        const [all, rows, s, mods, chosen, saved] = await Promise.all([
           db.cards.toArray(),
           db.states.toArray(),
           loadSettings(),
           db.modules.toArray(),
           loadAreaChoices(),
+          loadBossLife(lifeKey),
         ])
         const t = now()
         const map = new Map(rows.map((r) => [r.cardId, r.state]))
@@ -104,7 +108,11 @@ export function BattleScreen({
         setAreas(chosen)
         setSkippedInvalid(inScope.length - valid.length)
         setCards(ids.map((id) => byId.get(id)!))
-        setBattle(startBattle(ids.length))
+        // Boss-Leben über alle abfragbaren Karten im Umfang, nicht nur über die heutige Lernliste.
+        const life = bossLife(valid, map, t, s.retention)
+        const shown = Math.round(life.hp)
+        setRecovery(saved !== null && shown - saved >= 1 ? { from: saved, to: shown } : null)
+        setBattle(startBattle(ids.length, life))
       } catch (e) {
         if (!cancelled) setLoadError(`Die Karten konnten nicht geladen werden: ${message(e)}`)
       }
@@ -125,6 +133,8 @@ export function BattleScreen({
   useEffect(() => {
     if (done && !finished.current) {
       finished.current = true
+      // Fürs nächste Mal („hat sich erholt“); ein Fehler darf den Abschluss nicht verhindern.
+      if (battle) saveBossLife(lifeKey, battle.hp, now()).catch(() => {})
       onFinished?.(counts.right + counts.partial + counts.wrong)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -165,12 +175,17 @@ export function BattleScreen({
 
   if (done) {
     const final = endBattle(battle)
+    const lost = final.startHp - final.hp
     return (
       <section className="battle-result">
-        <h2 className="pixel">{final.defeated ? 'Besiegt!' : 'Geflohen'}</h2>
+        <h2 className="pixel">{defeated(final) ? 'Endgültig besiegt!' : lost > 0 ? 'Geschwächt' : 'Hält stand'}</h2>
         <p className="result-boss">{name}</p>
-        {final.defeated && final.knockouts > 1 && <p>Du hast ihn {final.knockouts}-mal zu Boden geschickt.</p>}
-        {!final.defeated && <p>Er flieht mit {hpPercent(final)} % Leben.</p>}
+        <p className="result-life pixel">
+          {final.startHp} → {final.hp}
+        </p>
+        {lost > 0 && <p>−{lost} Leben in dieser Runde</p>}
+        <p>Noch {hpPercent(final)} %</p>
+        {final.secured > 0 && <p>{final.secured === 1 ? '1 Karte sitzt jetzt sicher' : `${final.secured} Karten sitzen jetzt sicher`}</p>}
         <p className="summary">
           {counts.right} richtig, {counts.partial} teilweise, {counts.wrong} falsch
         </p>
@@ -196,12 +211,14 @@ export function BattleScreen({
       const retention = settings.current!.retention
       let prev: SrsState | undefined
       // Der Ausgangs-State wird beim Speichern frisch aus der Datenbank gelesen (ein Sync kann ihn geändert haben).
-      await recordReview(card.id, (p) => {
+      const res = await recordReview(card.id, (p) => {
         prev = p
         return review(p ?? newSrsState(t), toRating(outcome), t, { cardId: card.id, retention })
       })
       // Erst eine gespeicherte Antwort zählt im Kampf.
-      setBattle(applyAnswer(battle, { outcome, elapsedDays: elapsedDays(prev, t) }, rng, rested ? RESTED_LUCKY_CHANCE : LUCKY_CHANCE))
+      const before = cardLife(prev, t, retention)
+      const after = cardLife(res.state, t, retention)
+      setBattle(applyAnswer(battle, { outcome, elapsedDays: elapsedDays(prev, t), before, after }, rng, rested ? RESTED_LUCKY_CHANCE : LUCKY_CHANCE))
       setTurn((n) => n + 1)
       setCounts((c) => ({ ...c, [outcome]: c[outcome] + 1 }))
       setResult({ outcome, answer: detail })
@@ -222,7 +239,7 @@ export function BattleScreen({
 
   return (
     <section className="battle" ref={top}>
-      <Arena boss={boss} name={name} battle={battle} turn={turn} active={result !== null} />
+      <Arena boss={boss} name={name} battle={battle} turn={turn} active={result !== null} recovery={recovery} />
       <div className="battle-main">
         <div className="row between">
           <p className="progress pixel">

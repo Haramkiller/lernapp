@@ -423,10 +423,24 @@ button.module {
   background: linear-gradient(#ff6b6b, #c92a2a);
   transition: width 0.35s ease-out;
 }
-.phase {
+.hp-text {
   margin-left: 8px;
+  margin-top: 4px;
   font-size: 9px;
-  color: var(--accent);
+  color: #fff;
+  text-shadow: 2px 2px 0 #000;
+  white-space: nowrap;
+}
+.arena-recovery {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 46px;
+  z-index: 3;
+  margin: 0;
+  font-size: 9px;
+  line-height: 1.4;
+  color: var(--wrong);
   text-shadow: 2px 2px 0 #000;
 }
 .boss {
@@ -506,9 +520,6 @@ button.module {
 .callout.lucky {
   color: var(--right);
 }
-.callout.phase-up {
-  color: var(--wrong);
-}
 .boss-attacks {
   animation: arena-shake 0.5s;
 }
@@ -542,6 +553,10 @@ button.module {
 }
 .battle-result .result-boss {
   color: var(--muted);
+}
+.battle-result .result-life {
+  font-size: 20px;
+  margin: 8px 0 4px;
 }
 @media (prefers-reduced-motion: reduce) {
   .boss,

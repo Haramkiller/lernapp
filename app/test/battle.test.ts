@@ -26,6 +26,13 @@ describe('battle', () => {
     expect(defeated(b)).toBe(false)
   })
 
+  it('falsche Antwort auf eine neue Karte: trotzdem 0 Schaden (wie mit dem Nutzer vereinbart)', () => {
+    const b = applyAnswer(startBattle(3, { hp: 30, max: 30 }), { outcome: 'wrong', elapsedDays: null, before: 10, after: 9.2 }, never)
+    expect(b.hp).toBe(30)
+    expect(b.last!.damage).toBe(0)
+    expect(b.real).toBeCloseTo(29.2)
+  })
+
   it('angezeigte Schäden gehen auf und erreichen 0', () => {
     // Start 10.6 → Anzeige 11; zwei Antworten mit je 5.3 Schaden (einzeln gerundet wären es nur 10).
     let b = startBattle(2, { hp: 10.6, max: 20 })

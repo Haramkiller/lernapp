@@ -13,11 +13,12 @@ afterEach(() => vi.unstubAllGlobals())
 
 describe('Arena', () => {
   it('richtige Antwort kurz nach einer falschen: kein Boss-Angriff mehr', () => {
-    const afterWrong = applyAnswer(startBattle(3), { outcome: 'wrong', elapsedDays: null }, never)
+    const L = { hp: 30, max: 30 }
+    const afterWrong = applyAnswer(startBattle(3, L), { outcome: 'wrong', elapsedDays: null, before: 10, after: 10 }, never)
     const { container, rerender } = render(<Arena boss={boss} name="X" battle={afterWrong} turn={1} active />)
     expect(container.querySelector('.arena')).toHaveClass('boss-attacks')
     rerender(<Arena boss={boss} name="X" battle={afterWrong} turn={1} active={false} />)
-    const afterRight = applyAnswer(afterWrong, { outcome: 'right', elapsedDays: null }, never)
+    const afterRight = applyAnswer(afterWrong, { outcome: 'right', elapsedDays: null, before: 10, after: 4 }, never)
     rerender(<Arena boss={boss} name="X" battle={afterRight} turn={2} active />)
     expect(container.querySelector('.arena')).not.toHaveClass('boss-attacks')
   })
@@ -32,7 +33,7 @@ describe('Arena', () => {
         }
       },
     )
-    render(<Arena boss={boss} name="X" battle={startBattle(3)} turn={0} active={false} />)
+    render(<Arena boss={boss} name="X" battle={startBattle(3, { hp: 30, max: 30 })} turn={0} active={false} recovery={null} />)
     for (const f of [...bossFrames(boss, 'attack'), ...bossFrames(boss, 'hit'), ...fxFrames('combo3'), ...fxFrames('claw'), bossBackdrop(boss)]) {
       expect(loaded).toContain(f)
     }

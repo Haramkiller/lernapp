@@ -12,6 +12,8 @@ type Props = {
   turn: number
   /** true, solange die Rückmeldung zur letzten Antwort steht; sonst keine Treffer-Effekte. */
   active: boolean
+  /** Boss ist seit dem letzten Kampf gewachsen: bis zur ersten Antwort anzeigen. */
+  recovery?: { from: number; to: number } | null
 }
 
 const ATTACK_MS = 600
@@ -24,7 +26,7 @@ function effectsFor(hit: Hit): FxName[] {
 }
 
 /** Kampfbühne oberhalb der Frage: Kulisse, Boss, Lebensbalken, Treffer. Fängt keine Klicks ab. */
-export function Arena({ boss, name, battle, turn, active }: Props) {
+export function Arena({ boss, name, battle, turn, active, recovery = null }: Props) {
   const hit = battle.last
   const [anim, setAnim] = useState<BossAnim>('idle')
   const [attacking, setAttacking] = useState(false)
@@ -72,7 +74,9 @@ export function Arena({ boss, name, battle, turn, active }: Props) {
           >
             <span style={{ width: `${percent}%` }} />
           </div>
-          {battle.phase > 1 && <span className="phase pixel">Phase {battle.phase}</span>}
+          <span className="hp-text pixel">
+            {battle.hp} / {battle.maxHp}
+          </span>
         </div>
       </div>
       <div className={`boss${anim === 'attack' ? ' lunge' : ''}`}>
@@ -97,12 +101,16 @@ export function Arena({ boss, name, battle, turn, active }: Props) {
           -{hit.damage}
         </span>
       )}
+      {turn === 0 && recovery && (
+        <p className="arena-recovery pixel" role="status">
+          {boss.title} hat sich erholt: {recovery.from} → {recovery.to}
+        </p>
+      )}
       {show && (
         <div className="arena-callouts pixel" aria-live="polite">
           {battle.combo >= 3 && hit.outcome === 'right' && <span className="callout combo">Combo ×{battle.combo}</span>}
           {hit.crit && <span className="callout crit">Kritisch!</span>}
           {hit.lucky && <span className="callout lucky">Glückstreffer!</span>}
-          {hit.knockedOut && !battle.finished && <span className="callout phase-up">Er steht wieder auf! Phase {battle.phase}</span>}
         </div>
       )}
     </div>

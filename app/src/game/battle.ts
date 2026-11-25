@@ -72,7 +72,8 @@ export function applyAnswer(
   } else if (a.outcome === 'wrong') {
     combo = 0
   }
-  const dealt = b.dealt + Math.max(0, a.before - a.after)
+  // Falsch macht nie Schaden (vom Nutzer so gewählt), auch wenn eine neue Karte dabei ein wenig gelernt wurde.
+  const dealt = b.dealt + (a.outcome === 'wrong' ? 0 : Math.max(0, a.before - a.after))
   // Die Summe wird gerundet, nicht jeder Schaden: so gehen die angezeigten Zahlen auf und erreichen 0.
   const hp = Math.max(0, Math.round(b.start - dealt))
   const secured = a.before > 0 && a.after === 0
