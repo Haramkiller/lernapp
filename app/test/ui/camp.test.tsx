@@ -9,6 +9,7 @@ import { saveAreaChoice, saveLastBattleAt } from '../../src/data/game'
 import { CampScreen } from '../../src/ui/CampScreen'
 import { newSrsState, review, type SrsState } from '../../src/srs/scheduler'
 import { choiceCard } from './fixtures'
+import { bossLife, lifePercent } from '../../src/game/mastery'
 
 const NOW = new Date('2026-03-10T10:00:00.000Z')
 const YESTERDAY = new Date(NOW.getTime() - 24 * 60 * 60 * 1000)
@@ -54,14 +55,20 @@ describe('CampScreen', () => {
     expect(within(map).getByText(/^Tages-Quest/).textContent).toBe('Tages-Quest 0/5')
   })
 
-  it('Region zeigt Boss, Bedrohung, Themen-Fähnchen und startet den Kampf ausgeruht', async () => {
+  it('Region zeigt Boss, Boss-Leben, Themen-Fähnchen und startet den Kampf ausgeruht', async () => {
     await botanik()
     await work()
+    const states = new Map((await db.states.toArray()).map((r) => [r.cardId, r.state]))
+    const life = lifePercent(bossLife(await db.cards.toArray(), states, NOW, 0.9))!
+    expect(life).toBeGreaterThan(0)
+    expect(life).toBeLessThan(100)
     const { onBattle } = camp()
     await openMap()
-    await userEvent.click(await screen.findByRole('button', { name: 'Wald: Botanik' }))
+    const flag = await screen.findByRole('button', { name: 'Wald: Botanik' })
+    expect(within(flag).getByText(`Boss-Leben ${life} %`)).toBeInTheDocument()
+    await userEvent.click(flag)
     const panel = (await screen.findByText('Moosgolem · Botanik')).closest('section')!
-    expect(within(panel).getByText('Bedrohung 67 %')).toBeInTheDocument()
+    expect(within(panel).getByText(`Boss-Leben ${life} %`)).toBeInTheDocument()
     const zelle = screen.getByText('Zelle').closest('li')!
     expect(within(zelle).getByText('2 fällig')).toBeInTheDocument()
     expect(within(zelle).getByText('3 neu')).toBeInTheDocument()
@@ -88,7 +95,17 @@ describe('CampScreen', () => {
     expect(await screen.findByText(/^Ausgeruht/)).toBeInTheDocument()
   })
 
-  it('nichts zu tun: „Kämpfen“ gesperrt, unerforschtes Modul ohne Bedrohung', async () => {
+  it('Modul nur mit neuen Karten: Boss-Leben 100 %', async () => {
+    await botanik()
+    await db.cards.bulkPut([choiceCard('n1')])
+    camp()
+    await openMap()
+    await userEvent.click(await screen.findByRole('button', { name: 'Wald: Botanik' }))
+    const panel = (await screen.findByText('Moosgolem · Botanik')).closest('section')!
+    expect(within(panel).getByText('Boss-Leben 100 %')).toBeInTheDocument()
+  })
+
+  it('nichts zu tun: „Kämpfen“ gesperrt, Modul ohne Karten unerforscht', async () => {
     await botanik()
     camp()
     await openMap()

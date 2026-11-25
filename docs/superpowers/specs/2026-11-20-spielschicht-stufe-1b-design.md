@@ -108,10 +108,10 @@ Einstellungen und Synchronisieren bleiben erreichbar (z. B. kleines Menü-Symbol
 - **Bosse mit Fantasy-Charakter**, nicht bloß eine Zelle: z. B. „Hüter des Grünen Kodex“ für Botanik, mit Rüstung, Gesicht, Persönlichkeit.
 - *Vorschlag:* Man sieht **keine eigene Figur** (Ich-Perspektive wie im Gewächshaus); eigene Angriffe fliegen von unten ins Bild.
 - *Vorschlag:* Weitere Regeln aus dem Gesamtdesign bleiben: kein Tempobonus; **Krit** bei richtiger Antwort auf eine lange nicht gesehene Karte; **zufällige Bonus-Treffer**; Kampfgröße wie heute (bis 25 Karten).
-- *Vorschlag – zwei Arten von Boss-Leben:*
+- *Vorschlag – zwei Arten von Boss-Leben:* *Ersetzt durch `2026-11-25-boss-leben-design.md`.*
   - **Kampf-Leben** (im Kampf sichtbar): Der Boss hat für diesen Kampf so viel Leben, wie Fragen anstehen. Jede richtige Antwort trifft sichtbar; am Ende des Kampfes ist er für heute **besiegt oder geflohen**. Das sorgt für spürbare Treffer.
   - **Gebiets-Bedrohung** (auf der Karte sichtbar): Anteil der **schon gelernten** Karten des Moduls, die laut FSRS gerade nicht sicher sitzen (Abrufwahrscheinlichkeit unter Zielwert oder Stabilität unter einer Schwelle). Sie sinkt über Tage und **steigt wieder, wenn Wissen verblasst**.
-- **Nur Gelerntes zählt** (vom Nutzer entschieden): Noch nie gesehene Karten erhöhen die Bedrohung nicht. Kommen in der Werkstatt neue Karten dazu, welkt nichts; sie erscheinen als „neue Karten“ an der Region bzw. am Thema.
+- **Nur Gelerntes zählt** (vom Nutzer entschieden): *Ersetzt durch `2026-11-25-boss-leben-design.md`.* Noch nie gesehene Karten erhöhen die Bedrohung nicht. Kommen in der Werkstatt neue Karten dazu, welkt nichts; sie erscheinen als „neue Karten“ an der Region bzw. am Thema.
 - **Sitzt sicher:** Ein Thema sitzt sicher, wenn jede seiner Karten mindestens einmal gelernt wurde und alle gerade sicher sitzen → seine Pflanze wächst (6.2). Fällt eine gelernte Karte darunter, welkt die Pflanze.
 - Der Modul-Boss gilt als **endgültig besiegt**, sobald alle Themen des Moduls zum ersten Mal gleichzeitig sicher sitzen → besondere Pflanze im Beet (6.2). Er kann danach als „erholter“ Boss zurückkommen, wenn Wissen verblasst; die Pflanzen welken dann, sterben aber nie.
 - Kämpfe ziehen die fälligen und neuen Karten **eines Moduls**, gemischt über die Themen (bestehende Lernliste mit Modulfilter). **Training** mit nicht fälligen Karten bleibt möglich, ohne Boss-Schaden und ohne Fundstücke.

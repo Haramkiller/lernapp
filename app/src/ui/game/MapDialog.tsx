@@ -57,7 +57,7 @@ export function MapDialog({ overview, onBattle, onClose }: Props) {
                 </button>
               )
             }
-            const threat = Math.max(...modules.map((m) => m.threat ?? 0))
+            const life = Math.max(...modules.map((m) => m.life ?? 0))
             const todo = modules.reduce((n, m) => n + work(m), 0)
             return (
               <button
@@ -71,7 +71,7 @@ export function MapDialog({ overview, onBattle, onClose }: Props) {
               >
                 <span className="flag-title">{modules.map((m) => m.module.name).join(' · ')}</span>
                 <span className="flag-info">
-                  {threat > 0 && <span className="threat">{`Bedrohung ${threat} %`}</span>}
+                  {life > 0 && <span className="threat">{`Boss-Leben ${life} %`}</span>}
                   {todo > 0 && <span>{` ${todo} offen`}</span>}
                 </span>
               </button>
@@ -87,9 +87,9 @@ export function MapDialog({ overview, onBattle, onClose }: Props) {
                   <Sprite frames={bossFrames(m.boss, 'idle')} fps={m.boss.fps} className="region-boss" />
                   <div>
                     <h3>{m.bossName}</h3>
-                    <p className="muted">{m.threat === null ? 'Noch unerforscht' : `Bedrohung ${m.threat} %`}</p>
+                    <p className="muted">{m.life === null ? 'Noch unerforscht' : `Boss-Leben ${m.life} %`}</p>
                     <span className="bar threat-bar" aria-hidden="true">
-                      <span style={{ width: `${m.threat ?? 0}%` }} />
+                      <span style={{ width: `${m.life ?? 0}%` }} />
                     </span>
                   </div>
                 </div>
