@@ -1,8 +1,11 @@
 import type { AreaChoices } from '../game/bosses'
+import type { Milestones } from '../game/garden'
 import { db, type GameItem } from './db'
 
 const AREA = 'area:'
 const REST = 'rest'
+const TOPIC = 'topic:'
+const BOSS = 'boss:'
 
 /** Speichert lokal und legt den Eintrag für den nächsten Sync in die Outbox (in einer Transaktion). */
 export async function putGameItem(item: GameItem): Promise<void> {
@@ -31,4 +34,22 @@ export async function loadLastBattleAt(): Promise<Date | null> {
 
 export async function saveLastBattleAt(at: Date): Promise<void> {
   await putGameItem({ id: REST, data: { at: at.toISOString() }, updatedAt: at.toISOString() })
+}
+
+/** Gewächshaus: wann ein Thema erstmals sicher saß bzw. ein Modul erstmals ganz blühte. */
+export async function loadMilestones(): Promise<Milestones> {
+  const ms: Milestones = { securedAt: new Map(), defeatedAt: new Map() }
+  for (const { id, data } of await db.game.where('id').startsWith(TOPIC).toArray())
+    if (typeof data.securedAt === 'string') ms.securedAt.set(id.slice(TOPIC.length), data.securedAt)
+  for (const { id, data } of await db.game.where('id').startsWith(BOSS).toArray())
+    if (typeof data.defeatedAt === 'string') ms.defeatedAt.set(id.slice(BOSS.length), data.defeatedAt)
+  return ms
+}
+
+/** Schreibt nur die übergebenen (neuen) Meilensteine; gibt ihre Anzahl zurück. */
+export async function recordMilestones(found: { topics: string[]; modules: string[] }, now: Date): Promise<number> {
+  const at = now.toISOString()
+  for (const t of found.topics) await putGameItem({ id: TOPIC + t, data: { securedAt: at }, updatedAt: at })
+  for (const m of found.modules) await putGameItem({ id: BOSS + m, data: { defeatedAt: at }, updatedAt: at })
+  return found.topics.length + found.modules.length
 }
