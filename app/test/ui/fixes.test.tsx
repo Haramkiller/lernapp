@@ -12,7 +12,7 @@ import { newSrsState, review } from '../../src/srs/scheduler'
 import { Cloze } from '../../src/ui/questions/Cloze'
 import { BattleScreen } from '../../src/ui/BattleScreen'
 import { seededRng } from '../../src/ui/random'
-import { choiceCard, clozeCard, orderCard } from './fixtures'
+import { choiceCard, clozeCard, orderCard, pick } from './fixtures'
 
 const NOW = new Date('2026-03-10T10:00:00.000Z')
 
@@ -29,7 +29,7 @@ describe('Einheit vorzeitig beenden', () => {
     await db.cards.bulkPut([choiceCard('a'), choiceCard('b'), choiceCard('c')])
     const onFinished = vi.fn()
     render(<BattleScreen now={() => NOW} rng={seededRng(1)} onFinished={onFinished} onExit={vi.fn()} />)
-    await userEvent.click(await screen.findByRole('button', { name: /Richtig B/ }))
+    await pick(await screen.findByRole('button', { name: /Richtig B/ }))
     await userEvent.click(await screen.findByRole('button', { name: 'Weiter' }))
     expect(onFinished).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'Beenden' }))
@@ -61,7 +61,7 @@ describe('fehlerhafte Karten', () => {
     await db.cards.bulkPut([broken(), choiceCard('ok')])
     render(<BattleScreen now={() => NOW} rng={seededRng(1)} onExit={vi.fn()} />)
     expect(await screen.findByRole('button', { name: /Richtig B/ })).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: /Richtig B/ }))
+    await pick(screen.getByRole('button', { name: /Richtig B/ }))
     await userEvent.click(await screen.findByRole('button', { name: 'Weiter' }))
     expect(await screen.findByText(/1 fehlerhafte Karte/)).toBeInTheDocument()
   })
@@ -81,10 +81,10 @@ describe('Fehler werden angezeigt', () => {
     render(<BattleScreen now={() => NOW} rng={seededRng(1)} onExit={vi.fn()} />)
     const option = await screen.findByRole('button', { name: /Richtig B/ })
     const spy = vi.spyOn(db.states, 'put').mockRejectedValue(new Error('Speicher voll'))
-    await userEvent.click(option)
+    await pick(option)
     expect(await screen.findByRole('alert')).toHaveTextContent('Die Antwort konnte nicht gespeichert werden: Speicher voll')
     spy.mockRestore()
-    await userEvent.click(screen.getByRole('button', { name: /Richtig B/ }))
+    await pick(screen.getByRole('button', { name: /Richtig B/ }))
     expect(await screen.findByRole('button', { name: 'Weiter' })).toBeInTheDocument()
     expect(await db.states.count()).toBe(1)
   })
@@ -103,7 +103,7 @@ describe('Zähler neuer Karten', () => {
   it('falsch beantwortete neue Karte zählt genau einmal, auch bei späterer Wiederholung', async () => {
     await db.cards.bulkPut([choiceCard('a')])
     render(<BattleScreen now={() => NOW} rng={seededRng(1)} onExit={vi.fn()} />)
-    await userEvent.click(await screen.findByRole('button', { name: /Falsch A/ }))
+    await pick(await screen.findByRole('button', { name: /Falsch A/ }))
     await screen.findByRole('button', { name: 'Weiter' })
     const key = newDoneKey(NOW)
     expect((await db.meta.get(key))?.value).toBe(1)
@@ -122,7 +122,7 @@ describe('Zähler neuer Karten', () => {
     clock = new Date(2026, 2, 10, 4, 1)
     const after = newDoneKey(clock)
     expect(after).not.toBe(before)
-    await userEvent.click(option)
+    await pick(option)
     await screen.findByRole('button', { name: 'Weiter' })
     expect((await db.meta.get(after))?.value).toBe(1)
     expect(await db.meta.get(before)).toBeUndefined()

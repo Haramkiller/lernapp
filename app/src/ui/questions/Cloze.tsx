@@ -1,6 +1,24 @@
 import { Fragment, useState, type FormEvent } from 'react'
 import { checkCloze } from '../../answers/check'
 import type { QuestionProps } from '../types'
+import { AnswerBar } from './AnswerBar'
+
+/** Lücke im Satz: wächst mit der Eingabe, gestrichelt solange leer. */
+function Gap({ n, value, onChange }: { n: number; value: string; onChange: (v: string) => void }) {
+  return (
+    <input
+      className={`gap${value ? ' filled' : ''}`}
+      aria-label={`Lücke ${n + 1}`}
+      value={value}
+      size={Math.max(5, value.length + 2)}
+      placeholder="…"
+      autoCapitalize="off"
+      autoComplete="off"
+      spellCheck={false}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  )
+}
 
 export function Cloze({ card, onAnswer }: QuestionProps<'cloze'>) {
   const { text, gaps } = card.payload
@@ -21,45 +39,26 @@ export function Cloze({ card, onAnswer }: QuestionProps<'cloze'>) {
   }
 
   return (
-    <form onSubmit={submit}>
+    <form className="ask" onSubmit={submit}>
+      <span className="ask-kind">Lückentext</span>
       <p className="question cloze">
         {!placeholdersOk && text.replace(/\{\{\d+\}\}/g, '…')}
         {placeholdersOk && parts.map((part, i) => {
           if (i % 2 === 0) return <Fragment key={i}>{part}</Fragment>
           const n = Number(part) - 1
           return (
-            <input
-              key={i}
-              className="gap"
-              aria-label={`Lücke ${n + 1}`}
-              value={inputs[n] ?? ''}
-              autoCapitalize="off"
-              autoComplete="off"
-              spellCheck={false}
-              onChange={(e) => setInputs((prev) => prev.map((v, k) => (k === n ? e.target.value : v)))}
-            />
+            <Gap key={i} n={n} value={inputs[n] ?? ''} onChange={(v) => setInputs((prev) => prev.map((x, j) => (j === n ? v : x)))} />
           )
         })}
       </p>
       {!placeholdersOk && (
         <div className="stack">
           {gaps.map((_, n) => (
-            <input
-              key={n}
-              className="gap"
-              aria-label={`Lücke ${n + 1}`}
-              value={inputs[n] ?? ''}
-              autoCapitalize="off"
-              autoComplete="off"
-              spellCheck={false}
-              onChange={(e) => setInputs((prev) => prev.map((v, k) => (k === n ? e.target.value : v)))}
-            />
+            <Gap key={n} n={n} value={inputs[n] ?? ''} onChange={(v) => setInputs((prev) => prev.map((x, j) => (j === n ? v : x)))} />
           ))}
         </div>
       )}
-      <button type="submit" className="primary">
-        Prüfen
-      </button>
+      <AnswerBar submit />
     </form>
   )
 }

@@ -31,6 +31,8 @@ function questionOf(card: Card): string {
   }
 }
 
+const ICON: Record<Outcome, string> = { right: '✓', partial: '~', wrong: '✕' }
+
 const mark = (ok: boolean) => (ok ? '✓' : '✗')
 const empty = (s: string | undefined) => (s && s.trim() ? s : '(leer)')
 
@@ -142,20 +144,25 @@ function Details({ card, answer }: { card: Card; answer: Answer }) {
 export function Feedback({ card, outcome, answer, onNext, onAsk }: FeedbackProps) {
   return (
     <section className={`feedback ${outcome}`} aria-live="polite">
-      <h2 className="pixel">{TITLE[outcome]}</h2>
+      <h2 className="pixel feedback-title">
+        <span className="feedback-icon" aria-hidden="true">
+          {ICON[outcome]}
+        </span>
+        {TITLE[outcome]}
+      </h2>
       <p className="question">{questionOf(card)}</p>
       <Details card={card} answer={answer} />
       {card.explanation && <p className="explanation">{card.explanation}</p>}
       {card.source && (
         <p className="source">{`${card.source.file}, S. ${card.source.page}: „${card.source.quote}“`}</p>
       )}
-      <div className="row">
+      <div className="answer-bar feedback-bar">
         {onAsk && (
           <button type="button" onClick={onAsk}>
             Nachfragen
           </button>
         )}
-        <button type="button" className="primary" onClick={onNext} autoFocus>
+        <button type="button" className="primary cta" onClick={onNext} autoFocus>
           Weiter
         </button>
       </div>

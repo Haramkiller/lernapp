@@ -7,7 +7,7 @@ import userEvent from '@testing-library/user-event'
 import { db } from '../../src/data/db'
 import { BattleScreen } from '../../src/ui/BattleScreen'
 import { seededRng } from '../../src/ui/random'
-import { choiceCard } from './fixtures'
+import { choiceCard, pick } from './fixtures'
 import { newDoneKey } from '../../src/session/queue'
 import { newSrsState, review } from '../../src/srs/scheduler'
 import { BOSSES, bossFor } from '../../src/game/bosses'
@@ -28,7 +28,7 @@ describe('BattleScreen', () => {
 
     for (let i = 0; i < 25; i++) {
       const right = i % 5 !== 4 // 20 richtig, 5 falsch
-      await userEvent.click(await screen.findByRole('button', { name: right ? /Richtig B/ : /Falsch A/ }))
+      await pick(await screen.findByRole('button', { name: right ? /Richtig B/ : /Falsch A/ }))
       expect(await db.states.count()).toBe(i + 1)
       await userEvent.click(await screen.findByRole('button', { name: 'Weiter' }))
     }
@@ -53,7 +53,7 @@ describe('BattleScreen', () => {
     const earlier = new Date(NOW.getTime() - 60 * 60_000)
     const pulled = review(newSrsState(earlier), 3, earlier, { cardId: 'a' }).state
     await db.states.put({ cardId: 'a', state: pulled, updatedAt: earlier.toISOString() })
-    await userEvent.click(option)
+    await pick(option)
     await screen.findByRole('button', { name: 'Weiter' })
     const saved = (await db.states.get('a'))!
     expect(saved.state.reps).toBe(pulled.reps + 1)
@@ -74,12 +74,12 @@ describe('BattleScreen', () => {
     await db.cards.bulkPut([choiceCard('c1'), choiceCard('c2')])
     const renderAsk = (card: { id: string }) => <p>Dialog für {card.id}</p>
     render(<BattleScreen now={() => NOW} rng={seededRng(1)} onExit={vi.fn()} renderAsk={renderAsk} />)
-    await userEvent.click(await screen.findByRole('button', { name: /Richtig B/ }))
+    await pick(await screen.findByRole('button', { name: /Richtig B/ }))
     await userEvent.click(await screen.findByRole('button', { name: 'Nachfragen' }))
     expect(screen.getByText(/Dialog für c/)).toBeInTheDocument()
     await userEvent.click(await screen.findByRole('button', { name: 'Weiter' }))
     expect(screen.queryByText(/Dialog für/)).not.toBeInTheDocument()
-    await userEvent.click(await screen.findByRole('button', { name: /Richtig B/ }))
+    await pick(await screen.findByRole('button', { name: /Richtig B/ }))
     await userEvent.click(await screen.findByRole('button', { name: 'Nachfragen' }))
     await userEvent.click(screen.getByRole('button', { name: 'Beenden' }))
     expect(screen.queryByText(/Dialog für/)).not.toBeInTheDocument()
@@ -93,7 +93,7 @@ describe('BattleScreen', () => {
       </button>
     )
     const { container } = render(<BattleScreen now={() => NOW} rng={seededRng(1)} onExit={vi.fn()} renderAsk={renderAsk} />)
-    await userEvent.click(await screen.findByRole('button', { name: /Falsch A/ }))
+    await pick(await screen.findByRole('button', { name: /Falsch A/ }))
     await userEvent.click(await screen.findByRole('button', { name: 'Nachfragen' }))
     await userEvent.click(screen.getByRole('button', { name: 'Schließen' }))
     expect(container.querySelectorAll('section.feedback')).toHaveLength(1)
@@ -105,8 +105,8 @@ describe('BattleScreen: Kampf', () => {
   const bar = () => screen.getByRole('progressbar', { name: 'Leben des Bosses' })
   const botanik = () => db.modules.put({ id: 'm1', name: 'Botanik', examDate: null, styleProfile: null, updatedAt: NOW.toISOString() })
   const cards = (n: number) => db.cards.bulkPut(Array.from({ length: n }, (_, i) => choiceCard(`k${i}`)))
-  const right = async () => userEvent.click(await screen.findByRole('button', { name: /Richtig B/ }))
-  const wrong = async () => userEvent.click(await screen.findByRole('button', { name: /Falsch A/ }))
+  const right = async () => pick(await screen.findByRole('button', { name: /Richtig B/ }))
+  const wrong = async () => pick(await screen.findByRole('button', { name: /Falsch A/ }))
   const next = async () => userEvent.click(await screen.findByRole('button', { name: 'Weiter' }))
 
   afterEach(() => vi.unstubAllGlobals())

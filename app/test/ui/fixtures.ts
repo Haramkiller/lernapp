@@ -1,4 +1,12 @@
 import type { Card } from '@lernapp/shared'
+import { screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+
+/** Auswahlfrage beantworten: Option antippen, dann „Prüfen“. */
+export async function pick(option: HTMLElement): Promise<void> {
+  await userEvent.click(option)
+  await userEvent.click(screen.getByRole('button', { name: 'Prüfen' }))
+}
 
 type Base = Pick<
   Card,

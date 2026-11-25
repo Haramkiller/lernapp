@@ -10,7 +10,7 @@ import { db } from '../../src/data/db'
 import { saveSignedInMarker } from '../../src/data/account'
 import { loadOverride, saveOverride } from '../../src/data/settings'
 import { loadLastBattleAt, saveAreaChoice } from '../../src/data/game'
-import { choiceCard } from './fixtures'
+import { choiceCard, pick } from './fixtures'
 
 const URL_A = 'https://a.supabase.co'
 const env = { url: URL_A, key: 'anon-a' }
@@ -265,7 +265,7 @@ describe('App: Titelbild, Lagerfeuer, Kampf', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Lagerfeuer – Karte öffnen' }))
     await userEvent.click(await screen.findByRole('button', { name: 'Wald: Botanik' }))
     await userEvent.click(await screen.findByRole('button', { name: 'Kämpfen' }))
-    await userEvent.click(await screen.findByRole('button', { name: /Richtig B/ }))
+    await pick(await screen.findByRole('button', { name: /Richtig B/ }))
     await screen.findByRole('button', { name: 'Weiter' })
     await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Beenden' })).toBeEnabled())
     await userEvent.click(screen.getByRole('button', { name: 'Beenden' }))
