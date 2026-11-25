@@ -1,10 +1,11 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
-import { CardDraftSchema, type Card, type Module } from '@lernapp/shared'
+import type { Card, Module } from '@lernapp/shared'
 import { db } from '../data/db'
 import { loadSettings } from '../data/settings'
 import { recordReview } from '../data/sync'
 import { LUCKY_CHANCE, RESTED_LUCKY_CHANCE, applyAnswer, endBattle, hpPercent, startBattle, type Battle } from '../game/battle'
 import { bossFor, type AreaChoices } from '../game/bosses'
+import { isPlayable } from '../game/mastery'
 import { loadAreaChoices } from '../data/game'
 import { buildQueue, newDoneKey, type Settings } from '../session/queue'
 import { toRating, type Outcome } from '../srs/grading'
@@ -38,8 +39,6 @@ type Props = {
   validate?: (card: Card) => boolean
 }
 
-const schemaValid = (card: Card): boolean => CardDraftSchema.safeParse({ ...card, topic: 'x' }).success
-
 type Counts = Record<Outcome, number>
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
@@ -58,7 +57,7 @@ export function BattleScreen({
   onFinished,
   onExit,
   renderAsk,
-  validate = schemaValid,
+  validate = isPlayable,
 }: Props) {
   const [cards, setCards] = useState<Card[] | null>(null)
   const [modules, setModules] = useState<Module[]>([])

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { Topic } from '@lernapp/shared'
-import { dailyQuest, isLearned, isSecure, moduleThreat, topicStatus } from '../src/game/mastery'
+import type { Card, Topic } from '@lernapp/shared'
+import { CARD_LIFE, bossLife, cardLife, dailyQuest, isLearned, isPlayable, isSecure, lifePercent, topicStatus } from '../src/game/mastery'
 import { newSrsState, review, type SrsState } from '../src/srs/scheduler'
 import { choiceCard } from './ui/fixtures'
 
@@ -56,19 +56,47 @@ describe('topicStatus', () => {
   })
 })
 
-describe('moduleThreat', () => {
-  it('nur neue Karten: keine Bedrohung (null)', () => {
-    expect(moduleThreat([choiceCard('a')], new Map(), NOW, 0.9)).toBeNull()
+describe('Boss-Leben', () => {
+  it('neue Karte zählt 10, sicher sitzende 0', () => {
+    expect(cardLife(undefined, NOW, 0.9)).toBe(CARD_LIFE)
+    expect(cardLife(newSrsState(NOW), NOW, 0.9)).toBe(10)
+    expect(cardLife(secure('a'), NOW, 0.9)).toBe(0)
   })
 
-  it('Anteil unsicherer unter den gelernten, nie gelernte zählen nicht', () => {
-    const cards = ['a', 'b', 'c', 'd', 'e'].map((id) => choiceCard(id))
-    const states = new Map([
-      ['a', secure('a')],
-      ['b', learned('b')],
-    ])
-    expect(moduleThreat(cards, states, NOW, 0.9)).toBe(50)
-    expect(moduleThreat(cards, new Map([['a', secure('a')]]), NOW, 0.9)).toBe(0)
+  it('cardLife ist genau dann 0, wenn isSecure', () => {
+    const later = new Date(NOW.getTime() + 200 * DAY)
+    const cases: [SrsState | undefined, Date][] = [
+      [undefined, NOW],
+      [learned('a'), NOW],
+      [learned('a', NOW, 1), NOW],
+      [secure('a'), NOW],
+      [secure('a'), later],
+    ]
+    for (const [s, at] of cases) expect(cardLife(s, at, 0.9) === 0).toBe(isSecure(s, at, 0.9))
+  })
+
+  it('halbe Stabilität bei vollem Abruf: 5', () => {
+    const s: SrsState = { ...learned('a'), stability: 3.5, last_review: NOW.toISOString() }
+    expect(cardLife(s, NOW, 0.9)).toBeCloseTo(5)
+  })
+
+  it('verblasste Karte gewinnt Leben zurück', () => {
+    const later = new Date(NOW.getTime() + 60 * DAY)
+    expect(cardLife(secure('a'), later, 0.9)).toBeGreaterThan(0)
+    expect(cardLife(secure('a'), later, 0.9)).toBeLessThan(10)
+  })
+
+  it('bossLife: Summe und Höchstwert, gelöschte und ungültige Karten zählen nicht', () => {
+    const bad = { ...choiceCard('x'), payload: {} } as unknown as Card
+    expect(isPlayable(choiceCard('a'))).toBe(true)
+    expect(isPlayable(bad)).toBe(false)
+    const cards = [choiceCard('a'), choiceCard('b'), choiceCard('c'), choiceCard('d', { deleted: true }), bad]
+    expect(bossLife(cards, new Map([['c', secure('c')]]), NOW, 0.9)).toEqual({ hp: 20, max: 30 })
+  })
+
+  it('lifePercent: null ohne Karten, sonst gerundet', () => {
+    expect(lifePercent({ hp: 0, max: 0 })).toBeNull()
+    expect(lifePercent({ hp: 13.4, max: 20 })).toBe(67)
   })
 })
 

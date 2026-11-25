@@ -2,14 +2,14 @@ import type { Card, Module, Topic } from '@lernapp/shared'
 import type { SrsState } from '../srs/scheduler'
 import { buildQueue, type Settings } from '../session/queue'
 import { REGIONS, assignBosses, type AreaChoices, type BossDef, type RegionDef } from './bosses'
-import { dailyQuest, moduleThreat, topicStatus, type Quest, type TopicStatus } from './mastery'
+import { bossLife, dailyQuest, isPlayable, lifePercent, topicStatus, type Quest, type TopicStatus } from './mastery'
 
 export type ModuleView = {
   module: Module
   boss: BossDef
   bossName: string
-  /** null = noch keine gelernte Karte. */
-  threat: number | null
+  /** Boss-Leben in % des Höchstwerts; null = Modul ohne Karten. */
+  life: number | null
   due: number
   fresh: number
   topics: TopicStatus[]
@@ -37,7 +37,7 @@ export function buildOverview(input: {
 
   const views = [...modules].sort(byName).map((module): ModuleView => {
     const boss = bosses.get(module.id)!
-    const mine = cards.filter((c) => c.moduleId === module.id && !c.deleted)
+    const mine = cards.filter((c) => c.moduleId === module.id && !c.deleted && isPlayable(c))
     const queue = buildQueue({ cards: mine, states, newDoneToday, now, settings, moduleId: module.id })
     const queued = new Set(queue)
     const fresh = queue.filter((id) => !states.has(id)).length
@@ -45,7 +45,7 @@ export function buildOverview(input: {
       module,
       boss,
       bossName: `${boss.title} · ${module.name}`,
-      threat: moduleThreat(mine, states, now, retention),
+      life: lifePercent(bossLife(mine, states, now, retention)),
       due: queue.length - fresh,
       fresh,
       topics: topics

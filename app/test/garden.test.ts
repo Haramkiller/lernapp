@@ -119,6 +119,22 @@ describe('newMilestones', () => {
     expect(newMilestones(beds(both, known), known)).toEqual({ topics: ['t2'], modules: ['m1'] })
   })
 
+  it('ungültige Karte zählt nicht: Thema blüht und Modul wird besiegt', () => {
+    const bad = { ...choiceCard('x', { topicId: 't1' }), payload: {} } as unknown as (typeof cards)[number]
+    const withBad = buildGarden({
+      modules,
+      topics,
+      cards: [...cards, bad],
+      states: new Map([['a', secure('a')], ['b', secure('b')]]),
+      now: NOW,
+      retention: 0.9,
+      chosen: new Map(),
+      milestones: none,
+    })
+    expect(withBad[0]!.plants.map((p) => p.stage)).toEqual(['bloom', 'bloom'])
+    expect(newMilestones(withBad, none).modules).toEqual(['m1'])
+  })
+
   it('Modul ohne Pflanzen wird nie besiegt', () => {
     const empty = buildGarden({ modules, topics: [], cards: [], states: new Map(), now: NOW, retention: 0.9, chosen: new Map(), milestones: none })
     expect(newMilestones(empty, none).modules).toEqual([])

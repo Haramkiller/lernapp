@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Module, Topic } from '@lernapp/shared'
 import { buildOverview } from '../src/game/overview'
-import { dailyQuest } from '../src/game/mastery'
+import { bossLife, dailyQuest, lifePercent } from '../src/game/mastery'
 import { BOSSES } from '../src/game/bosses'
 import { newSrsState, review } from '../src/srs/scheduler'
 import { choiceCard } from './ui/fixtures'
@@ -20,7 +20,21 @@ describe('buildOverview', () => {
     expect(filled).toHaveLength(1)
     const view = filled[0]!.modules[0]!
     expect(filled[0]!.region.id).toBe(view.boss.region)
-    expect(view).toMatchObject({ bossName: `${view.boss.title} · Botanik`, threat: null, due: 0, fresh: 1 })
+    expect(view).toMatchObject({ bossName: `${view.boss.title} · Botanik`, life: 100, due: 0, fresh: 1 })
+  })
+
+  it('Modul ohne Karten: kein Boss-Leben (null)', () => {
+    const o = buildOverview({ ...base, cards: [], topics: [], modules: [mod('m1', 'Botanik')] })
+    expect(o.regions.flatMap((r) => r.modules)[0]!.life).toBeNull()
+  })
+
+  it('ungültige Karten zählen nicht zum Boss-Leben', () => {
+    const bad = { ...choiceCard('x'), payload: {} } as unknown as (typeof cards)[number]
+    const cards = [choiceCard('a')]
+    const o = buildOverview({ ...base, cards: [...cards, bad], topics: [], modules: [mod('m1', 'Botanik')] })
+    const view = o.regions.flatMap((r) => r.modules)[0]!
+    expect(view.life).toBe(100)
+    expect(view.fresh).toBe(1)
   })
 
   it('gewähltes Gebiet verschiebt das Modul', () => {
@@ -35,7 +49,7 @@ describe('buildOverview', () => {
     expect(o.regions.some((r) => r.modules.length === 2)).toBe(true)
   })
 
-  it('Themen alphabetisch mit Fähnchen; Bedrohung aus den gelernten Karten', () => {
+  it('Themen alphabetisch mit Fähnchen; Boss-Leben über alle Karten des Moduls', () => {
     const cards = [choiceCard('a', { topicId: 't1' }), choiceCard('b', { topicId: 't2' })]
     const states = new Map([['a', review(newSrsState(NOW), 3, NOW, { cardId: 'a' }).state]])
     const o = buildOverview({
@@ -48,7 +62,8 @@ describe('buildOverview', () => {
     const view = o.regions.flatMap((r) => r.modules)[0]!
     expect(view.topics.map((t) => t.topic.name)).toEqual(['Blatt', 'Zelle'])
     expect(view.topics[0]).toMatchObject({ fresh: 1, secure: false })
-    expect(view.threat).toBe(100)
+    expect(view.life).toBe(lifePercent(bossLife(cards, states, NOW, 0.9)))
+    expect(view.life).toBeLessThan(100)
   })
 
   it('verirrte Karten: fällig, aber Modul unbekannt', () => {

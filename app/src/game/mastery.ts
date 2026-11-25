@@ -1,5 +1,5 @@
 import { State } from 'ts-fsrs'
-import { studyDay, type Card, type Topic } from '@lernapp/shared'
+import { CardDraftSchema, studyDay, type Card, type Topic } from '@lernapp/shared'
 import { recall, type SrsState } from '../srs/scheduler'
 import { buildQueue, type Settings } from '../session/queue'
 
@@ -38,12 +38,37 @@ export function topicStatus(
   }
 }
 
-/** Anteil (0–100) der gelernten Karten, die gerade nicht sicher sitzen; null ohne gelernte Karte. */
-export function moduleThreat(cards: Card[], states: Map<string, SrsState>, now: Date, retention: number): number | null {
-  const learned = cards.filter((c) => !c.deleted && isLearned(states.get(c.id)))
-  if (learned.length === 0) return null
-  const shaky = learned.filter((c) => !isSecure(states.get(c.id), now, retention)).length
-  return Math.round((shaky / learned.length) * 100)
+/** Karte lässt sich abfragen (gleiche Prüfung wie vor dem Kampf); ungültige Karten zählen nirgends. */
+export function isPlayable(card: Card): boolean {
+  return CardDraftSchema.safeParse({ ...card, topic: 'x' }).success
+}
+
+/** Leben, das eine Karte dem Boss ihres Moduls höchstens gibt (neue Karte). */
+export const CARD_LIFE = 10
+
+/**
+ * Leben einer Karte: 10 × (1 − Stabilitätsanteil × Abrufanteil), beide bei 1 gedeckelt.
+ * Neu = 10, sitzt sicher (isSecure) = 0; Vergessen lässt den Wert wieder steigen.
+ */
+export function cardLife(s: SrsState | undefined, now: Date, retention: number): number {
+  if (!isLearned(s)) return CARD_LIFE
+  const stable = Math.min(1, s.stability / SECURE_STABILITY_DAYS)
+  const kept = Math.min(1, recall(s, now) / retention)
+  return CARD_LIFE * (1 - stable * kept)
+}
+
+/** `hp` ungerundet; `max` = 10 je Karte. */
+export type Life = { hp: number; max: number }
+
+/** Boss-Leben über alle nicht gelöschten, abfragbaren Karten. */
+export function bossLife(cards: Card[], states: Map<string, SrsState>, now: Date, retention: number): Life {
+  const live = cards.filter((c) => !c.deleted && isPlayable(c))
+  return { hp: live.reduce((n, c) => n + cardLife(states.get(c.id), now, retention), 0), max: live.length * CARD_LIFE }
+}
+
+/** Anteil (0–100) am Höchstwert; null ohne Karten. */
+export function lifePercent(life: Life): number | null {
+  return life.max === 0 ? null : Math.round((life.hp / life.max) * 100)
 }
 
 export type Quest = { done: number; total: number }

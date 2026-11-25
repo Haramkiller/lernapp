@@ -1,7 +1,7 @@
 import type { Card, Module, Topic } from '@lernapp/shared'
 import type { SrsState } from '../srs/scheduler'
 import { assignBosses, type AreaChoices, type RegionId } from './bosses'
-import { isLearned, isSecure } from './mastery'
+import { isLearned, isPlayable, isSecure } from './mastery'
 
 /**
  * Gewächshaus: Zustand jeder Pflanze wird aus dem Lernstand berechnet, nie gespeichert (Spec 8).
@@ -69,7 +69,7 @@ export function buildGarden(input: {
   const { modules, topics, cards, states, now, retention, chosen, milestones } = input
   const bosses = assignBosses(modules, chosen)
   const byTopic = new Map<string, Card[]>()
-  for (const c of cards) if (!c.deleted) byTopic.set(c.topicId, [...(byTopic.get(c.topicId) ?? []), c])
+  for (const c of cards) if (!c.deleted && isPlayable(c)) byTopic.set(c.topicId, [...(byTopic.get(c.topicId) ?? []), c])
 
   return [...modules].sort(byName).map((module) => {
     const region = bosses.get(module.id)!.region
