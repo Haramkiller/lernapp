@@ -1,97 +1,96 @@
 import { describe, expect, it, vi } from 'vitest'
-import { RESTED_LUCKY_CHANCE, applyAnswer, endBattle, hpPercent, startBattle } from '../src/game/battle'
+import { RESTED_LUCKY_CHANCE, applyAnswer, defeated, endBattle, hpPercent, startBattle } from '../src/game/battle'
 
 const never = () => 0.99 // kein Glückstreffer
-const R = { outcome: 'right' as const, elapsedDays: 1 }
+const L = { hp: 40, max: 40 }
+/** Richtig, Karte fällt von 10 auf 4. */
+const R = { outcome: 'right' as const, elapsedDays: 1, before: 10, after: 4 }
 
 describe('battle', () => {
-  it('startet mit 10 Leben je Frage', () => {
-    expect(startBattle(3)).toMatchObject({ hp: 30, maxHp: 30, phase: 1, combo: 0, finished: false })
+  it('startet mit gerundetem Leben', () => {
+    expect(startBattle(3, { hp: 30.4, max: 40 })).toMatchObject({ startHp: 30, hp: 30, maxHp: 40, combo: 0, secured: 0, finished: false })
   })
 
-  it('richtig trifft mit 10, ab Combo 3 mit 13, ab Combo 6 mit 16', () => {
-    let b = startBattle(20)
-    const dmg: number[] = []
+  it('Schaden = vorher − nachher, Anzeige sinkt', () => {
+    const b = applyAnswer(startBattle(3, L), { ...R, after: 4.4 }, never)
+    expect(b.hp).toBe(34)
+    expect(b.last!.damage).toBe(6)
+    expect(hpPercent(b)).toBe(85)
+  })
+
+  it('falsche Antwort: 0 Schaden, Anzeige bleibt, echtes Leben steigt', () => {
+    const b = applyAnswer(startBattle(3, { hp: 20, max: 40 }), { outcome: 'wrong', elapsedDays: 1, before: 2, after: 7 }, never)
+    expect(b.hp).toBe(20)
+    expect(b.last!.damage).toBe(0)
+    expect(b.real).toBe(25)
+    expect(defeated(b)).toBe(false)
+  })
+
+  it('angezeigte Schäden gehen auf und erreichen 0', () => {
+    // Start 10.6 → Anzeige 11; zwei Antworten mit je 5.3 Schaden (einzeln gerundet wären es nur 10).
+    let b = startBattle(2, { hp: 10.6, max: 20 })
+    b = applyAnswer(b, { outcome: 'right', elapsedDays: 1, before: 5.3, after: 0 }, never)
+    const first = b.last!.damage
+    b = applyAnswer(b, { outcome: 'right', elapsedDays: 1, before: 5.3, after: 0 }, never)
+    expect(first + b.last!.damage).toBe(11)
+    expect(b.hp).toBe(0)
+    expect(defeated(b)).toBe(true)
+  })
+
+  it('Combo, Krit und Glück ändern den Schaden nicht', () => {
+    const b = applyAnswer(startBattle(3, L), { ...R, elapsedDays: 7 }, () => 0.05)
+    expect(b.last).toMatchObject({ damage: 6, crit: true, lucky: true })
+  })
+
+  it('Combo-Stufen 3 und 6, bestCombo; teilweise hält die Combo, falsch setzt sie zurück', () => {
+    let b = startBattle(20, { hp: 200, max: 200 })
+    const tiers: number[] = []
     for (let i = 0; i < 6; i++) {
       b = applyAnswer(b, R, never)
-      dmg.push(b.last!.damage)
+      tiers.push(b.last!.tier)
     }
-    expect(dmg).toEqual([10, 10, 13, 13, 13, 16])
-    expect(b.last!.tier).toBe(3)
+    expect(tiers).toEqual([1, 1, 2, 2, 2, 3])
+    expect(b.bestCombo).toBe(6)
+    b = applyAnswer(b, { ...R, outcome: 'partial' }, never)
+    expect(b.combo).toBe(6)
+    b = applyAnswer(b, { ...R, outcome: 'wrong' }, never)
+    expect(b.combo).toBe(0)
     expect(b.bestCombo).toBe(6)
   })
 
-  it('Krit bei Karte, die 7 Tage oder länger nicht gesehen wurde; neue Karte nie', () => {
-    expect(applyAnswer(startBattle(5), { outcome: 'right', elapsedDays: 7 }, never).last).toMatchObject({ damage: 20, crit: true })
-    expect(applyAnswer(startBattle(5), { outcome: 'right', elapsedDays: 6 }, never).last!.crit).toBe(false)
-    expect(applyAnswer(startBattle(5), { outcome: 'right', elapsedDays: null }, never).last!.crit).toBe(false)
+  it('Krit nur bei Karte, die 7 Tage oder länger nicht gesehen wurde', () => {
+    expect(applyAnswer(startBattle(3, L), { ...R, elapsedDays: 6 }, never).last!.crit).toBe(false)
+    expect(applyAnswer(startBattle(3, L), { ...R, elapsedDays: null }, never).last!.crit).toBe(false)
   })
 
-  it('ausgeruht: Glückstreffer schon bei rng 0.2', () => {
-    expect(applyAnswer(startBattle(5), R, () => 0.2).last!.lucky).toBe(false)
-    expect(applyAnswer(startBattle(5), R, () => 0.2, RESTED_LUCKY_CHANCE).last!.lucky).toBe(true)
-  })
-
-  it('Glückstreffer +5 bei rng < 0.1', () => {
-    expect(applyAnswer(startBattle(5), R, () => 0.05).last).toMatchObject({ damage: 15, lucky: true })
+  it('secured zählt Karten, die auf 0 fallen', () => {
+    let b = applyAnswer(startBattle(3, L), { ...R, before: 3, after: 0 }, never)
+    expect(b.last!.secured).toBe(true)
+    b = applyAnswer(b, { ...R, before: 0, after: 0 }, never)
+    expect(b.last!.secured).toBe(false)
+    expect(b.secured).toBe(1)
   })
 
   it('rng wird bei falsch und teilweise nicht benutzt', () => {
     const rng = vi.fn(() => 0)
-    let b = applyAnswer(startBattle(5), { outcome: 'wrong', elapsedDays: 9 }, rng)
-    b = applyAnswer(b, { outcome: 'partial', elapsedDays: 9 }, rng)
+    let b = applyAnswer(startBattle(5, L), { ...R, outcome: 'wrong' }, rng)
+    b = applyAnswer(b, { ...R, outcome: 'partial' }, rng)
     expect(rng).not.toHaveBeenCalled()
   })
 
-  it('teilweise: 5 Schaden, Combo bleibt; falsch: 0 Schaden, Combo weg', () => {
-    let b = applyAnswer(applyAnswer(startBattle(9), R, never), R, never)
-    b = applyAnswer(b, { outcome: 'partial', elapsedDays: 1 }, never)
-    expect(b.last!.damage).toBe(5)
-    expect(b.combo).toBe(2)
-    b = applyAnswer(b, { outcome: 'wrong', elapsedDays: 1 }, never)
-    expect(b.last!.damage).toBe(0)
-    expect(b.combo).toBe(0)
+  it('ausgeruht: Glückstreffer schon bei rng 0.2', () => {
+    expect(applyAnswer(startBattle(5, L), R, () => 0.2).last!.lucky).toBe(false)
+    expect(applyAnswer(startBattle(5, L), R, () => 0.2, RESTED_LUCKY_CHANCE).last!.lucky).toBe(true)
   })
 
-  it('besiegt, wenn die letzte Antwort ihn auf 0 bringt', () => {
-    const b = applyAnswer(applyAnswer(startBattle(2), R, never), R, never)
-    expect(b).toMatchObject({ hp: 0, finished: true, defeated: true })
+  it('nach der letzten Frage beendet', () => {
+    const b = applyAnswer(applyAnswer(startBattle(2, L), R, never), R, never)
+    expect(b).toMatchObject({ answered: 2, finished: true, hp: 28 })
   })
 
-  it('k.o. vor der letzten Frage: nächste Phase mit 10 Leben je offener Frage', () => {
-    let b = applyAnswer(startBattle(3), { outcome: 'right', elapsedDays: 30 }, never) // 20
-    b = applyAnswer(b, R, never) // 10 → 0, eine Frage offen
-    expect(b.last!.knockedOut).toBe(true)
-    expect(b).toMatchObject({ phase: 2, hp: 10, maxHp: 10, finished: false })
-    b = applyAnswer(b, { outcome: 'wrong', elapsedDays: 1 }, never)
-    // Einmal zu Boden geschickt zählt als besiegt, auch wenn die letzte Antwort danebenging.
-    expect(b).toMatchObject({ finished: true, defeated: true, knockouts: 1 })
-  })
-
-  it('fast perfekter Kampf (nur die letzte falsch) endet nicht mit „Geflohen“', () => {
-    let b = startBattle(25)
-    for (let i = 0; i < 24; i++) b = applyAnswer(b, R, never)
-    b = applyAnswer(b, { outcome: 'wrong', elapsedDays: 1 }, never)
-    expect(b.defeated).toBe(true)
-    expect(b.knockouts).toBeGreaterThan(1)
-  })
-
-  it('nie zu Boden geschickt: geflohen', () => {
-    let b = startBattle(3)
-    for (let i = 0; i < 3; i++) b = applyAnswer(b, { outcome: 'partial', elapsedDays: 1 }, never)
-    expect(b).toMatchObject({ finished: true, defeated: false, knockouts: 0 })
-  })
-
-  it('Beenden nach einem k.o.: besiegt', () => {
-    let b = applyAnswer(startBattle(3), { outcome: 'right', elapsedDays: 30 }, never)
-    b = applyAnswer(b, R, never)
-    expect(endBattle(b).defeated).toBe(true)
-  })
-
-  it('Beenden: geflohen, danach keine Änderung mehr', () => {
-    const b = endBattle(applyAnswer(startBattle(4), R, never))
-    expect(b).toMatchObject({ finished: true, defeated: false })
-    expect(hpPercent(b)).toBe(75)
+  it('Beenden vorzeitig, danach keine Änderung mehr', () => {
+    const b = endBattle(applyAnswer(startBattle(4, L), R, never))
+    expect(b.finished).toBe(true)
     expect(applyAnswer(b, R, never)).toEqual(b)
   })
 })
