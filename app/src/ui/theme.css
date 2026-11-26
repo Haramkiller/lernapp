@@ -405,6 +405,8 @@ button.module {
   border-radius: 10px;
   background: #0d0b16;
   isolation: isolate;
+  /* Boss richtet seine Größe nach der Bühnenhöhe (cqh), damit er auf flachen Bühnen nicht oben abgeschnitten wird. */
+  container-type: size;
 }
 .arena-backdrop {
   position: absolute;
@@ -467,6 +469,8 @@ button.module {
   left: 50%;
   bottom: 2%;
   width: min(78%, 330px);
+  /* Kopf (ca. 15 % Rand im Bild) bleibt unter Name und Lebensbalken (ca. 50 px). */
+  width: min(78%, 330px, calc((98cqh - 52px) / 0.85));
   transform: translateX(-50%);
   transition: transform 0.25s ease-out;
   z-index: 1;

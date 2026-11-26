@@ -113,6 +113,11 @@ describe('Funde in der Spieltabelle', () => {
     expect([...(await loadDesign()).placements]).toEqual([['tuer-links', 'moosstein']])
   })
 
+  it('loadDesign: Plätze, die es nicht mehr gibt, zählen nicht (Stück wird frei)', async () => {
+    await db.game.put({ id: 'place:zurueck-mitte', data: { item: 'waldteich' }, updatedAt: '2026-03-10T08:00:00.000Z' })
+    expect([...(await loadDesign()).placements]).toEqual([])
+  })
+
   it('raiseSoil: kostet 2/4/6 Dünger, zu wenig wirft', async () => {
     await saveFind(find({ id: '1', item: 'farn', foundAt: '2026-03-10T07:00:00.000Z' }))
     await saveFind(find({ id: '2', item: 'farn', foundAt: '2026-03-10T08:00:00.000Z' }))

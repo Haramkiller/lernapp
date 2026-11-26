@@ -39,7 +39,7 @@ export const FOG_IMAGES = [gameAsset('map/fog_0.png'), gameAsset('map/fog_1.png'
 
 /* ---------------- Gewächshaus ---------------- */
 
-export type ViewId = 'gang' | 'tuer' | 'zurueck' | 'beetL' | 'beetR'
+export type ViewId = 'gang' | 'tuer' | 'beetL' | 'beetR'
 export type Move = 'forward' | 'left' | 'right' | 'back'
 /**
  * Beet-Fläche in % der Kulisse: x/w waagerecht, y = Fußlinie der hinteren Reihe, y + h = vordere Reihe.
@@ -54,7 +54,7 @@ export const MIN_PLANT_SIZE = (32 / 375) * 100
 const NEAR_SIZE = 28
 
 const view = (name: string) => gameAsset(`garden/views/${name}.png`)
-/** Fernansichten: je Seite das hintere, ganz sichtbare Beet (ausgemessen an gang.png / zurueck.png). */
+/** Fernansichten: je Seite das hintere, ganz sichtbare Beet (ausgemessen an gang.png). */
 const farBeds: BedArea[] = [
   { side: 'left', x: 8, y: 60, w: 27, h: 4, scale: 0.45, max: 6 },
   { side: 'right', x: 65, y: 60, w: 27, h: 4, scale: 0.45, max: 6 },
@@ -63,14 +63,8 @@ const nearBed: BedArea[] = [{ side: 'left', x: 13, y: 67, w: 74, h: 5, scale: 1,
 
 export const GARDEN_VIEWS: Record<ViewId, GardenView> = {
   gang: { image: view('gang'), name: 'Eingang', moves: { forward: 'tuer', left: 'beetL', right: 'beetR' }, beds: farBeds },
-  tuer: { image: view('tuer'), name: 'An der Tür', door: true, moves: { back: 'zurueck' }, beds: [] },
-  zurueck: {
-    image: view('zurueck'),
-    name: 'Blick zurück',
-    moves: { forward: 'gang', left: 'beetR', right: 'beetL' },
-    // Umgedreht: das rechte Beet liegt jetzt links.
-    beds: farBeds.map((b) => ({ ...b, side: b.side === 'left' ? 'right' : 'left' })),
-  },
+  // Kein Umdrehen: „Zurück“ führt wieder zum Eingang, damit jedes Beet auf seiner Seite bleibt.
+  tuer: { image: view('tuer'), name: 'An der Tür', door: true, moves: { back: 'gang' }, beds: [] },
   beetL: { image: view('beet'), name: 'Beet links', moves: { back: 'gang' }, beds: nearBed },
   beetR: { image: view('beet'), mirror: true, name: 'Beet rechts', moves: { back: 'gang' }, beds: nearBed.map((b) => ({ ...b, side: 'right' })) },
 }
@@ -85,11 +79,10 @@ export const GARDEN_SLOTS: GardenSlot[] = [
   { id: 'gang-mitte', view: 'gang', x: 50, y: 84, w: 26, size: 'large' },
   { id: 'gang-links', view: 'gang', x: 33, y: 96, w: 12, size: 'small' },
   { id: 'gang-rechts', view: 'gang', x: 67, y: 96, w: 12, size: 'small' },
-  { id: 'zurueck-mitte', view: 'zurueck', x: 50, y: 84, w: 26, size: 'large' },
-  { id: 'zurueck-links', view: 'zurueck', x: 33, y: 96, w: 12, size: 'small' },
-  { id: 'zurueck-rechts', view: 'zurueck', x: 67, y: 96, w: 12, size: 'small' },
   { id: 'tuer-links', view: 'tuer', x: 18, y: 88, w: 14, size: 'small' },
   { id: 'tuer-rechts', view: 'tuer', x: 82, y: 88, w: 14, size: 'small' },
+  // Vorn auf dem Weg, unterhalb der Tür: das Lagerfeuer bleibt sichtbar.
+  { id: 'tuer-mitte', view: 'tuer', x: 50, y: 97, w: 24, size: 'large' },
   { id: 'beetL-links', view: 'beetL', x: 36, y: 97, w: 13, size: 'small' },
   { id: 'beetL-rechts', view: 'beetL', x: 64, y: 97, w: 13, size: 'small' },
   { id: 'beetR-links', view: 'beetR', x: 36, y: 97, w: 13, size: 'small' },

@@ -54,8 +54,9 @@ describe('Gewächshaus', () => {
 
   it('Navigation wie im Rundgang', () => {
     expect(GARDEN_VIEWS.gang.moves).toEqual({ forward: 'tuer', left: 'beetL', right: 'beetR' })
-    expect(GARDEN_VIEWS.tuer).toMatchObject({ door: true, moves: { back: 'zurueck' } })
-    expect(GARDEN_VIEWS.zurueck.moves).toEqual({ forward: 'gang', left: 'beetR', right: 'beetL' })
+    // Kein Umdrehen mehr: „Zurück“ führt von der Tür wieder zum Eingang, die Beete bleiben auf ihrer Seite.
+    expect(GARDEN_VIEWS.tuer).toMatchObject({ door: true, moves: { back: 'gang' } })
+    expect(Object.keys(GARDEN_VIEWS)).not.toContain('zurueck')
     expect(GARDEN_VIEWS.beetR).toMatchObject({ mirror: true, image: GARDEN_VIEWS.beetL.image, moves: { back: 'gang' } })
   })
 

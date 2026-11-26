@@ -52,17 +52,17 @@ beforeEach(async () => {
 })
 
 describe('GreenhouseScreen', () => {
-  it('Rundgang: Eingang → Tür → Lagerfeuer, Umdrehen → Blick zurück', async () => {
+  it('Rundgang: Eingang → Tür → Lagerfeuer, „Zurück“ → wieder Eingang (kein Umdrehen)', async () => {
     await botanik()
     const { onCamp } = open()
     expect(await screen.findByText('Eingang')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '↓ Umdrehen' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '↓ Zurück' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /Umdrehen/ })).toBeNull()
     await userEvent.click(await btn('↑ Vorwärts'))
     expect(await screen.findByText('An der Tür')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '↶ Links' })).toBeDisabled()
-    await userEvent.click(screen.getByRole('button', { name: '↓ Umdrehen' }))
-    expect(await screen.findByText('Blick zurück')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: '↑ Vorwärts' }))
+    await userEvent.click(screen.getByRole('button', { name: '↓ Zurück' }))
+    expect(await screen.findByText('Eingang')).toBeInTheDocument()
     await userEvent.click(await btn('↑ Vorwärts'))
     await userEvent.click(await btn('↑ Zum Lagerfeuer'))
     expect(onCamp).toHaveBeenCalled()
@@ -114,7 +114,7 @@ describe('GreenhouseScreen', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Beet ›' }))
     expect(screen.getByText('Chemie')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Säuren' })).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: '↓ Umdrehen' }))
+    await userEvent.click(screen.getByRole('button', { name: '↓ Zurück' }))
     await userEvent.click(await btn('Rechts ↷'))
     expect(await screen.findByText('Beet rechts')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Blatt' })).toBeInTheDocument()

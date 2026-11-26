@@ -31,7 +31,7 @@ Vom Nutzer freigegebener Stil-Entwurf: Moosgolem auf einer Waldlichtung, Treffer
 - **Regions-Symbole** (`map/<region>.png`) und **Nebel** (`map/fog_0.png`, `fog_1.png`): `create_1_direction_object`, 64 px, 16 Kandidaten in einem Aufruf (gleicher Stil). Auf der Karte stehen nur Fähnchen und Nebel; die Symbole erscheinen im Region-Detail.
 
 ## Gewächshaus (Teil 3, freigegeben am 2026-11-25)
-- **Blickpunkte** (`garden/views/{gang,tuer,zurueck,beet}.png`): `create_image_pro` 192×256 mit Referenzbild, Inneres des Glashauses aus dem Titelbild bei Dämmerung; `tuer` = offene Tür mit Blick aufs Lagerfeuer; „Beet rechts“ ist `beet.png` gespiegelt.
+- **Blickpunkte** (`garden/views/{gang,tuer,beet}.png`; der „Blick zurück“ wurde am 2026-11-26 entfernt, weil Umdrehen die Beet-Seiten vertauschte): `create_image_pro` 192×256 mit Referenzbild, Inneres des Glashauses aus dem Titelbild bei Dämmerung; `tuer` = offene Tür mit Blick aufs Lagerfeuer; „Beet rechts“ ist `beet.png` gespiegelt.
 - **Pflanzen** (`garden/plants/p<art>_{young,bloom,wilted}.png`, `seed.png`, `sprout.png`): `create_1_direction_object` 64 px, `view: sidescroller`, 16 Kandidaten in einem Aufruf mit `item_descriptions` (12 Arten in Blüte + Saat/Sämling); Grundbeschreibung „small flowering plant growing from soil, side view, muted dusky night palette with one glowing accent color, dark outline, no pot“.
   - „jung“ und „welk“ je Art mit `create_object_state` aus der Blüte (damit es dieselbe Pflanze bleibt): jung = grüne geschlossene Knospen, kürzer, kein Leuchten; welk = hängend, bräunlich verblasst, abgefallene Blätter, kein Leuchten.
   - Arten: 0 Farn, 1 Tulpe, 2 Sternkraut, 3 Fingerhut, 4 Rosette, 5 Sonnenblume, 6 Pilze, 7 Lilie, 8 Distel, 9 Ranke, 10 Lavendel, 11 Mohn.

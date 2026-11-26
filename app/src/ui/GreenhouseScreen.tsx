@@ -92,7 +92,7 @@ const MOVES: { move: Move; label: string; cls: string }[] = [
   { move: 'left', label: '↶ Links', cls: 'nav-left' },
   { move: 'forward', label: '↑ Vorwärts', cls: 'nav-forward' },
   { move: 'right', label: 'Rechts ↷', cls: 'nav-right' },
-  { move: 'back', label: '↓ Umdrehen', cls: 'nav-back' },
+  { move: 'back', label: '↓ Zurück', cls: 'nav-back' },
 ]
 
 /** Pseudozufällige, aber feste Flugbahnen, damit Insekten nicht bei jedem Rendern springen. */

@@ -1,6 +1,7 @@
 import { studyDay } from '@lernapp/shared'
 import { MAX_SOIL, SOIL_COST, fertilizer, researchedByModule, researchedByState, type Find, type FindStatus } from '../game/finds'
 import { isPlayable, isSecure } from '../game/mastery'
+import { GARDEN_SLOTS } from '../game/scenes'
 import { db, type GameItem } from './db'
 import { putGameItem } from './game'
 import { loadSettings } from './settings'
@@ -80,7 +81,11 @@ export async function checkResearch(now: Date): Promise<number> {
 export type Design = { placements: Map<string, string>; soil: Map<string, number> }
 
 export async function loadDesign(): Promise<Design> {
-  const placed = (await rows(PLACE)).filter((r): r is GameItem & { data: { item: string } } => typeof r.data.item === 'string')
+  // Nur Plätze, die es (noch) gibt; ein Stück auf einem entfernten Platz ist wieder frei.
+  const slots = new Set(GARDEN_SLOTS.map((s) => PLACE + s.id))
+  const placed = (await rows(PLACE)).filter(
+    (r): r is GameItem & { data: { item: string } } => typeof r.data.item === 'string' && slots.has(r.id),
+  )
   // Nach einem Sync kann ein Stück auf zwei Plätzen stehen: der zuletzt geänderte gewinnt.
   const newest = new Map<string, GameItem>()
   for (const r of placed) {
