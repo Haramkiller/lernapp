@@ -1,9 +1,12 @@
 import { Rating, type Grade } from 'ts-fsrs'
 
 export type Outcome = 'wrong' | 'partial' | 'right'
+/** Einschätzung vor dem Aufdecken (Teil 5b). */
+export type Confidence = 'sure' | 'unsure'
 
-/** Easy wird in Stufe 1a bewusst nicht vergeben. */
-export function toRating(outcome: Outcome): Grade {
+/** Easy wird bewusst nicht vergeben. Richtig, aber unsicher → Schwer (kommt früher wieder). */
+export function toRating(outcome: Outcome, confidence?: Confidence | null): Grade {
+  if (outcome === 'right' && confidence === 'unsure') return Rating.Hard
   switch (outcome) {
     case 'wrong':
       return Rating.Again

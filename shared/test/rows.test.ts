@@ -63,3 +63,17 @@ describe('rows', () => {
     expect(rowToModule({ id: 'm', name: 'n', exam_date: null, style_profile: null, updated_at: '2026-01-01T01:00:00+01:00' }).updatedAt).toBe('2026-01-01T00:00:00.000Z')
   })
 })
+
+describe('logToRow mit Einschätzung', () => {
+  const base = { id: 'l1', cardId: 'c1', rating: 2 as const, reviewedAt: 'r', studyDay: '2026-01-01', elapsedDays: 0 }
+  it('ohne Einschätzung keine neuen Spalten', () => {
+    const row = logToRow(base)
+    expect('confidence' in row).toBe(false)
+    expect('outcome' in row).toBe(false)
+  })
+  it('mit Einschätzung beide Spalten', () => {
+    const row = logToRow({ ...base, confidence: 'unsure', outcome: 'right' })
+    expect(row.confidence).toBe('unsure')
+    expect(row.outcome).toBe('right')
+  })
+})

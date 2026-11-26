@@ -13,6 +13,10 @@ export type ReviewLog = {
   reviewedAt: string
   studyDay: string
   elapsedDays: number
+  /** Einschätzung vor dem Aufdecken; fehlt bei freien Antworten und alten Einträgen. */
+  confidence?: 'sure' | 'unsure'
+  /** Ergebnis der Antwort, nur zusammen mit confidence (die Bewertung allein unterscheidet „richtig + unsicher“ nicht von „teilweise“). */
+  outcome?: 'right' | 'partial' | 'wrong'
 }
 
 // Bewusst die Legacy-API von ts-fsrs 6 (fsrs/createEmptyCard/next/retrievability):

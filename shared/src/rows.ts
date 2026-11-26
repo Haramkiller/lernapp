@@ -30,6 +30,8 @@ export type LogInput = {
   reviewedAt: string
   studyDay: string
   elapsedDays: number
+  confidence?: 'sure' | 'unsure'
+  outcome?: 'right' | 'partial' | 'wrong'
 }
 
 export type ModuleRow = {
@@ -63,6 +65,8 @@ export type LogRow = {
   reviewed_at: string
   study_day: string
   elapsed_days: number
+  confidence?: 'sure' | 'unsure' | null
+  outcome?: 'right' | 'partial' | 'wrong' | null
 }
 
 /** Normalisiert Postgres-Zeitstempel (+00:00, +01:00, Mikrosekunden) auf ISO-UTC mit Millisekunden. */
@@ -146,4 +150,7 @@ export const logToRow = (l: LogInput): LogRow => ({
   reviewed_at: l.reviewedAt,
   study_day: l.studyDay,
   elapsed_days: l.elapsedDays,
+  // Nur mitschicken, wenn vorhanden: Logs ohne Einschätzung funktionieren auch ohne die neuen Spalten.
+  ...(l.confidence ? { confidence: l.confidence } : {}),
+  ...(l.outcome ? { outcome: l.outcome } : {}),
 })
