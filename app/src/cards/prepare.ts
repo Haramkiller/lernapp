@@ -17,7 +17,7 @@ export type Prepared = {
   duplicates: number
 }
 
-function questionText(d: Pick<CardDraft, 'type' | 'payload'>): string {
+export function questionText(d: Pick<CardDraft, 'type' | 'payload'>): string {
   switch (d.type) {
     case 'choice':
     case 'free':

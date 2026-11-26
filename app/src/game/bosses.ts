@@ -109,3 +109,8 @@ export function bossFor(
   const boss = (module && assignBosses(modules, chosen).get(module.id)) ?? BOSSES[0]!
   return { boss, name: `${boss.title} · ${module?.name ?? UNKNOWN_AREA}` }
 }
+
+/** Region des Bosses, dem das Modul zugewiesen ist; unbekanntes Modul: Wald. */
+export function regionForModule(moduleId: string, modules: Pick<Module, 'id'>[], chosen?: AreaChoices): RegionId {
+  return assignBosses(modules, chosen).get(moduleId)?.region ?? 'wald'
+}
