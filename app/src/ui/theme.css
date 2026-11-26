@@ -1796,8 +1796,16 @@ button.cta:disabled {
 }
 /* Über der Tageszeit-Schicht: Bedienelemente und Schilder bleiben ungefärbt. */
 .scene .scene-where,
+.scene .scene-menu,
+.scene .scene-menu-panel,
 .scene .bed-sign,
 .scene .bed-pager,
 .scene .deco.slot-mark {
   z-index: 5;
+}
+.chest-finds .stack {
+  gap: 2px;
+}
+.chest-finds .glow.rarity-legendary::before {
+  inset: -22%;
 }

@@ -108,7 +108,7 @@ describe('Plätze für Fundstücke', () => {
     expect(GARDEN_SLOTS.some((s) => s.size === 'large')).toBe(true)
   })
 
-  it('kein Platz verdeckt Pflanzen oder das Beet-Schild; Nahansicht bleibt über dem Blättern', () => {
+  it('kein Platz verdeckt Pflanzen oder das Beet-Schild; Nahansicht bleibt zwischen den Blätter-Knöpfen', () => {
     for (const s of GARDEN_SLOTS) {
       const sx0 = s.x - s.w / 2
       const sx1 = s.x + s.w / 2
@@ -126,7 +126,11 @@ describe('Plätze für Fundstücke', () => {
         expect(plants, `${s.id} verdeckt Pflanzen`).toBe(false)
         expect(sign, `${s.id} verdeckt das Schild`).toBe(false)
       }
-      if (s.view === 'beetL' || s.view === 'beetR') expect(s.y, s.id).toBeLessThanOrEqual(86)
+      // Nahansicht: „‹ Beet“/„Beet ›“ liegen unten am Rand (je etwa 25 % breit) – Plätze bleiben dazwischen.
+      if (s.view === 'beetL' || s.view === 'beetR') {
+        expect(sx0, s.id).toBeGreaterThanOrEqual(26)
+        expect(sx1, s.id).toBeLessThanOrEqual(74)
+      }
     }
   })
 })

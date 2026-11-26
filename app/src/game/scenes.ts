@@ -83,17 +83,17 @@ export type GardenSlot = { id: string; view: ViewId; x: number; y: number; w: nu
 
 export const GARDEN_SLOTS: GardenSlot[] = [
   { id: 'gang-mitte', view: 'gang', x: 50, y: 84, w: 26, size: 'large' },
-  { id: 'gang-links', view: 'gang', x: 16, y: 90, w: 12, size: 'small' },
-  { id: 'gang-rechts', view: 'gang', x: 84, y: 90, w: 12, size: 'small' },
+  { id: 'gang-links', view: 'gang', x: 33, y: 96, w: 12, size: 'small' },
+  { id: 'gang-rechts', view: 'gang', x: 67, y: 96, w: 12, size: 'small' },
   { id: 'zurueck-mitte', view: 'zurueck', x: 50, y: 84, w: 26, size: 'large' },
-  { id: 'zurueck-links', view: 'zurueck', x: 16, y: 90, w: 12, size: 'small' },
-  { id: 'zurueck-rechts', view: 'zurueck', x: 84, y: 90, w: 12, size: 'small' },
+  { id: 'zurueck-links', view: 'zurueck', x: 33, y: 96, w: 12, size: 'small' },
+  { id: 'zurueck-rechts', view: 'zurueck', x: 67, y: 96, w: 12, size: 'small' },
   { id: 'tuer-links', view: 'tuer', x: 18, y: 88, w: 14, size: 'small' },
   { id: 'tuer-rechts', view: 'tuer', x: 82, y: 88, w: 14, size: 'small' },
-  { id: 'beetL-links', view: 'beetL', x: 6, y: 84, w: 11, size: 'small' },
-  { id: 'beetL-rechts', view: 'beetL', x: 94, y: 84, w: 11, size: 'small' },
-  { id: 'beetR-links', view: 'beetR', x: 6, y: 84, w: 11, size: 'small' },
-  { id: 'beetR-rechts', view: 'beetR', x: 94, y: 84, w: 11, size: 'small' },
+  { id: 'beetL-links', view: 'beetL', x: 36, y: 97, w: 13, size: 'small' },
+  { id: 'beetL-rechts', view: 'beetL', x: 64, y: 97, w: 13, size: 'small' },
+  { id: 'beetR-links', view: 'beetR', x: 36, y: 97, w: 13, size: 'small' },
+  { id: 'beetR-rechts', view: 'beetR', x: 64, y: 97, w: 13, size: 'small' },
 ]
 
 export function plantImage(species: number, stage: PlantStage): string {
