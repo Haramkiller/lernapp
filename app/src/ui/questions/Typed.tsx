@@ -31,6 +31,8 @@ export function Typed({ card, onAnswer }: QuestionProps<'choice'>) {
           placeholder="Antwort eintippen …"
           value={text}
           autoCapitalize="off"
+          autoCorrect="off"
+          enterKeyHint="done"
           autoComplete="off"
           spellCheck={false}
           autoFocus

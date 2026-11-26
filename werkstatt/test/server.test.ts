@@ -561,6 +561,22 @@ describe('Kernantworten ergänzen', () => {
     expect(runClaude).toHaveBeenCalledTimes(1)
   })
 
+  it('überschreibt keine Änderung, die während des Laufs an der Karte passiert', async () => {
+    let fg!: ReturnType<typeof setup>
+    const runClaude = vi.fn(async () => {
+      // Währenddessen ändert „Übernehmen“ die Karte (neuere Fassung in Supabase).
+      fg.state.cards = fg.state.cards.map((c) => (c.id === 'a' ? { ...c, examRelevant: true, updatedAt: '2030-01-01T00:00:00.000Z' } : c))
+      return JSON.stringify({ items: [{ id: 'a', typed: { answers: ['ATP'] } }] })
+    })
+    fg = setup({ runClaude }, { cards: cards() })
+    await login(fg.app)
+    const job = await waitJob(fg.app, (await request(fg.app).post('/api/typed').expect(200)).body.jobId)
+    expect(job.updated).toBe(1)
+    const [written] = fg.calls.upsertCards[0]!
+    expect(written!.examRelevant).toBe(true)
+    expect((written!.payload as { typed: unknown }).typed).toEqual({ answers: ['ATP'] })
+  })
+
   it('verlangt Login', async () => {
     const { app } = setup({}, { cards: cards() })
     await request(app, null).post('/api/typed').expect(401)

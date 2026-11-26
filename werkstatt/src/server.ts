@@ -362,7 +362,15 @@ export function createServer(deps: ServerDeps) {
     if (start < 0 || end < start) throw new Error('Antwort enthielt kein JSON.')
     const parsed = JSON.parse(raw.slice(start, end + 1)) as { items?: unknown }
     if (!Array.isArray(parsed.items)) throw new Error('Antwort ohne "items".')
-    const byId = new Map(batch.map((c) => [c.id, c]))
+    const inBatch = new Set(batch.map((c) => c.id))
+    // Frisch lesen: Während Claude arbeitet, kann „Übernehmen“ oder ein Import die Karte geändert haben.
+    // Geschrieben wird auf die aktuelle Fassung, nur wenn sie noch eine Auswahlkarte ohne Kernantwort ist.
+    const byId = new Map<string, ChoiceCard>()
+    for (const moduleId of new Set(batch.map((c) => c.moduleId))) {
+      for (const c of await gw().listCards(moduleId)) {
+        if (inBatch.has(c.id) && !c.deleted && c.type === 'choice' && c.payload.typed === undefined) byId.set(c.id, c)
+      }
+    }
     const now = new Date().toISOString()
     const out = new Map<string, Card>()
     for (const item of parsed.items as { id?: unknown; typed?: unknown }[]) {

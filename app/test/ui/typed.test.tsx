@@ -24,6 +24,11 @@ describe('Typed', () => {
     expect(onAnswer).toHaveBeenCalledWith('right', { kind: 'typed', text: 'mitochondrium', matched: true, overridden: false })
   })
 
+  it('Feld ohne Autokorrektur', () => {
+    render(<Typed card={card()} onAnswer={vi.fn()} />)
+    expect(input()).toHaveAttribute('autocorrect', 'off')
+  })
+
   it('„Prüfen“ ist bei leerem Feld deaktiviert', async () => {
     render(<Typed card={card()} onAnswer={vi.fn()} />)
     expect(screen.getByRole('button', { name: 'Prüfen' })).toBeDisabled()
