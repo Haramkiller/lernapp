@@ -27,6 +27,8 @@ type Props = {
   onSyncNow?: () => void
   /** Öffnet „Karten erstellen“. */
   onCreateCards?: () => void
+  /** Öffnet das Sammelbuch. */
+  onCollection?: () => void
   onGreenhouse?: () => void
 }
 
@@ -64,7 +66,7 @@ export async function loadOverview(t: Date): Promise<Data> {
   return { overview: buildOverview({ cards, states, topics, modules, newDoneToday, now: t, settings, chosen }), dead, lastBattleAt }
 }
 
-export function CampScreen({ now = () => new Date(), sync, refreshKey = 0, onBattle, onSettings, onSyncNow, onCreateCards, onGreenhouse }: Props) {
+export function CampScreen({ now = () => new Date(), sync, refreshKey = 0, onBattle, onSettings, onSyncNow, onCreateCards, onCollection, onGreenhouse }: Props) {
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [retry, setRetry] = useState(0)
@@ -154,7 +156,7 @@ export function CampScreen({ now = () => new Date(), sync, refreshKey = 0, onBat
             <span className="fire-glow" aria-hidden="true" />
             <Sprite frames={fireFrames()} fps={f.fps} />
           </button>
-          <SceneMenu sync={sync} dead={data.dead} onSettings={onSettings} onSyncNow={onSyncNow} onCreateCards={onCreateCards} />
+          <SceneMenu sync={sync} dead={data.dead} onSettings={onSettings} onSyncNow={onSyncNow} onCreateCards={onCreateCards} onCollection={onCollection} />
           <p className="scene-hint">
             {rested ? 'Ausgeruht · tippe aufs Feuer für die Karte' : `Pause am Feuer: noch ${minutesUntilRested(data.lastBattleAt, t)} min bis Ausgeruht`}
           </p>

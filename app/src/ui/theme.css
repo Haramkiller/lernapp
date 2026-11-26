@@ -1592,3 +1592,68 @@ button.cta:disabled {
     opacity: 0.6;
   }
 }
+/* Sammelbuch */
+.collection h1 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.collection .fertilizer {
+  font-size: 0.8rem;
+  color: #c8e88a;
+}
+.pending-list {
+  display: grid;
+  gap: 10px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.pending-list li {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+.pending-list .hint {
+  overflow-wrap: anywhere;
+}
+.find-region h2 {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+}
+.find-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.find-cell {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 6px;
+  border: 2px solid #000;
+  border-radius: 8px;
+  background: rgba(20, 18, 31, 0.6);
+  text-align: center;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.find-cell .glow {
+  width: 70%;
+}
+.find-cell.unerforscht img {
+  filter: saturate(0.4) brightness(0.8);
+}
+.find-cell.missing {
+  place-items: center;
+  min-height: 84px;
+  color: #6b6480;
+  font-family: var(--pixel);
+  font-size: 1.4rem;
+}
+@media (min-width: 420px) {
+  .find-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}

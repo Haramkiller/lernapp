@@ -210,6 +210,20 @@ describe('App: Karten erstellen', () => {
   })
 })
 
+describe('App: Sammelbuch', () => {
+  it('Menü → Sammelbuch und zurück ins Gewächshaus', async () => {
+    const { client } = fakeClient({ data: { session: session('u1') }, error: null })
+    render(<App env={env} makeClient={() => client} />)
+    await openMenu()
+    const panel = document.querySelector<HTMLElement>('.scene-menu-panel')!
+    await userEvent.click(within(panel).getByRole('button', { name: 'Sammelbuch' }))
+    expect(await screen.findByRole('heading', { name: 'Sammelbuch' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Zurück' }))
+    expect(await screen.findByRole('button', { name: 'Menü' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Sammelbuch' })).not.toBeInTheDocument()
+  })
+})
+
 describe('App: Kontowechsel', () => {
   it('anderes Konto mit offenen Änderungen: Warnung; Abbrechen meldet das neue Konto lokal ab', async () => {
     await db.meta.put({ key: 'owner', value: { url: URL_A, userId: 'u1' } })

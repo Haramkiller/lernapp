@@ -18,6 +18,8 @@ type Props = {
   onSyncNow?: () => void
   /** Öffnet „Karten erstellen“. */
   onCreateCards?: () => void
+  /** Öffnet das Sammelbuch. */
+  onCollection?: () => void
 }
 
 type Data = { beds: BedView[]; dead: number }
@@ -89,7 +91,7 @@ const FLIGHTS = [
   { x: 76, y: 60, d: -7.3 },
 ]
 
-export function GreenhouseScreen({ now = () => new Date(), sync, refreshKey = 0, onCamp, onSettings, onSyncNow, onCreateCards }: Props) {
+export function GreenhouseScreen({ now = () => new Date(), sync, refreshKey = 0, onCamp, onSettings, onSyncNow, onCreateCards, onCollection }: Props) {
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [retry, setRetry] = useState(0)
@@ -231,7 +233,7 @@ export function GreenhouseScreen({ now = () => new Date(), sync, refreshKey = 0,
           </span>
         ))}
         <span className="scene-where">{v.name}</span>
-        <SceneMenu sync={sync} dead={data.dead} onSettings={onSettings} onSyncNow={onSyncNow} onCreateCards={onCreateCards} />
+        <SceneMenu sync={sync} dead={data.dead} onSettings={onSettings} onSyncNow={onSyncNow} onCreateCards={onCreateCards} onCollection={onCollection} />
         {side && pages > 1 && (
           <div className="bed-pager">
             <button type="button" disabled={current === 0} onClick={(e) => (e.stopPropagation(), turnPage(side, -1))}>

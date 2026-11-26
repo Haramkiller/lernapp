@@ -11,6 +11,7 @@ import { AskDialog } from './ui/AskDialog'
 import { InstallHint } from './ui/InstallHint'
 import { CampScreen, type SyncStatus } from './ui/CampScreen'
 import { GreenhouseScreen } from './ui/GreenhouseScreen'
+import { CollectionScreen } from './ui/CollectionScreen'
 import { TitleScreen } from './ui/TitleScreen'
 import type { AuthMode, AuthResult } from './ui/LoginScreen'
 import { WelcomeFlow } from './ui/WelcomeFlow'
@@ -27,6 +28,7 @@ type View =
   | { name: 'study'; moduleId?: string; rested: boolean }
   | { name: 'settings'; from: Scene }
   | { name: 'cards'; from: Scene }
+  | { name: 'collection'; from: Scene }
 
 const defaultEnv = { url: import.meta.env.VITE_SUPABASE_URL as string | undefined, key: import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined }
 
@@ -222,6 +224,7 @@ export function App({ env = defaultEnv, makeClient = createAppClient, confirm = 
           onCamp={() => setView({ name: 'camp' })}
           onSettings={() => setView({ name: 'settings', from: 'greenhouse' })}
           onCreateCards={() => setView({ name: 'cards', from: 'greenhouse' })}
+          onCollection={() => setView({ name: 'collection', from: 'greenhouse' })}
           onSyncNow={() => void runSync()}
         />
       )}
@@ -232,6 +235,7 @@ export function App({ env = defaultEnv, makeClient = createAppClient, confirm = 
           onBattle={(moduleId, rested) => setView({ name: 'study', moduleId, rested })}
           onSettings={() => setView({ name: 'settings', from: 'camp' })}
           onCreateCards={() => setView({ name: 'cards', from: 'camp' })}
+          onCollection={() => setView({ name: 'collection', from: 'camp' })}
           onSyncNow={() => void runSync()}
           onGreenhouse={() => setView({ name: 'greenhouse' })}
         />
@@ -269,6 +273,7 @@ export function App({ env = defaultEnv, makeClient = createAppClient, confirm = 
           }}
         />
       )}
+      {view.name === 'collection' && <CollectionScreen onBack={() => setView({ name: view.from })} />}
       {view.name === 'settings' && (
         <SettingsScreen
           onBack={() => setView({ name: view.from })}
