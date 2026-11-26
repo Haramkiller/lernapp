@@ -38,3 +38,10 @@ Vom Nutzer freigegebener Stil-Entwurf: Moosgolem auf einer Waldlichtung, Treffer
 - **Baum** (`garden/plants/tree_{bloom,wilted}.png`): `create_1_direction_object` 128 px (4 Kandidaten), goldene leuchtende Blüten; welk über `create_object_state`.
 - **Insekten** (`garden/insects/{butterfly,bee}_<i>.png`): `create_1_direction_object` 32 px von oben (64 Kandidaten); Flügelschlag mit `slice_assets.py flap` durch Stauchen erzeugt.
 - Alles mit `slice_assets.py foot` auf quadratische Leinwand gebracht, Fuß unten mittig. Verbraucht: 280 Generierungen.
+
+## Fundstücke (Teil 4b, freigegeben am 2026-11-26)
+- **Fundstücke** (`finds/<id>.png`): `create_1_direction_object`, `view: sidescroller` (1-Richtung kennt kein flaches Top-down), Grundbeschreibung „small decorative object standing on the floor, side view seen slightly from above, muted dusky night palette with one glowing accent color, dark outline, no background“.
+  - Gewöhnlich und selten: 64 px, je 16 Kandidaten pro Aufruf über `item_descriptions` (8 Stücke × 2 Kandidaten).
+  - Legendär (Waldteich, Sporenbaum, Kristallbrunnen, Gezeitenbecken, Titanenstatue, Glutbaum): 128 px, 4 Kandidaten, eigene Beschreibung je Stück.
+- **Truhe** (`finds/truhe_zu.png`, `truhe_offen.png`): 64 px, gleicher Stil; der Seltenheits-Schimmer kommt per CSS, nicht aus dem Bild.
+- Alles mit `slice_assets.py foot` auf quadratische Leinwand gebracht, Fuß unten mittig. Verbraucht: 120 Generierungen (30 Stil-Entwurf + 90 Rest).
