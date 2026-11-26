@@ -1470,3 +1470,125 @@ button.cta:disabled {
     animation: find-fade 1.2s ease-out forwards;
   }
 }
+/* Truhe und Seltenheits-Leuchten: Schein hinter dem Bild, je Seltenheit eigene Farbe und Bewegung. */
+.chest {
+  align-items: center;
+  text-align: center;
+}
+.chest > .row {
+  justify-content: center;
+}
+.glow {
+  --glow: #6fdc8c;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  isolation: isolate;
+}
+.glow img {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  image-rendering: pixelated;
+}
+.glow::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: -18%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--glow) 0%, transparent 68%);
+  opacity: 0.75;
+  pointer-events: none;
+}
+.glow.rarity-rare {
+  --glow: #4aa8ff;
+}
+.glow.rarity-rare::before {
+  animation: glow-pulse 1.6s ease-in-out infinite;
+}
+.glow.rarity-legendary {
+  --glow: #ffcf4a;
+}
+.glow.rarity-legendary::before {
+  inset: -40%;
+  background:
+    radial-gradient(circle, var(--glow) 0%, rgba(255, 207, 74, 0.35) 40%, transparent 68%),
+    repeating-conic-gradient(rgba(255, 220, 120, 0.55) 0deg 10deg, transparent 10deg 30deg);
+  -webkit-mask: radial-gradient(circle, #000 35%, transparent 70%);
+  mask: radial-gradient(circle, #000 35%, transparent 70%);
+  animation: glow-spin 6s linear infinite;
+}
+.glow.rarity-legendary::after {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 25%, #fff 0 2px, transparent 3px),
+    radial-gradient(circle at 78% 35%, #fff6c8 0 2px, transparent 3px),
+    radial-gradient(circle at 60% 80%, #fff 0 1.5px, transparent 2.5px);
+  pointer-events: none;
+  animation: glint 2.4s ease-in-out infinite;
+}
+/* Dezenter Schein im Sammelbuch und im Gewächshaus: keine Strahlen, legendär glitzert ab und zu. */
+.glow.soft::before {
+  inset: -10%;
+  opacity: 0.35;
+  animation: none;
+  background: radial-gradient(circle, var(--glow) 0%, transparent 65%);
+  -webkit-mask: none;
+  mask: none;
+}
+.glow.soft.rarity-legendary::after {
+  animation: glint 7s ease-in-out infinite;
+}
+.night .glow.soft::before {
+  opacity: 0.7;
+}
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(0.92); }
+  50% { opacity: 0.95; transform: scale(1.08); }
+}
+@keyframes glow-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes glint {
+  0%, 80%, 100% { opacity: 0; }
+  88% { opacity: 1; }
+}
+.chest > .glow {
+  width: min(55%, 220px);
+  margin: 16px auto;
+}
+.chest-finds {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+.chest-finds li {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+.chest-finds li.newest {
+  grid-template-columns: 96px 1fr;
+}
+.rarity-name.rarity-common { color: #6fdc8c; }
+.rarity-name.rarity-rare { color: #4aa8ff; }
+.rarity-name.rarity-legendary { color: #ffcf4a; }
+@media (prefers-reduced-motion: reduce) {
+  .glow::before,
+  .glow::after {
+    animation: none !important;
+  }
+  .glow.rarity-legendary::after {
+    opacity: 0.6;
+  }
+}

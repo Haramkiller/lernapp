@@ -5,8 +5,9 @@ import { loadSettings } from '../data/settings'
 import { recordReview } from '../data/sync'
 import { LUCKY_CHANCE, RESTED_LUCKY_CHANCE, applyAnswer, defeated, endBattle, hpPercent, startBattle, type Battle } from '../game/battle'
 import { bossFor, regionForModule, type AreaChoices } from '../game/bosses'
-import { EMPTY_RUN, countsForLoot, nextDrops, rollFind, type LootRun } from '../game/finds'
-import { researchByAnswer, saveFind } from '../data/finds'
+import { EMPTY_RUN, countsForLoot, isDuplicate, itemById, nextDrops, rollFind, type LootRun } from '../game/finds'
+import { checkResearch, loadFinds, markOpened, researchByAnswer, saveFind } from '../data/finds'
+import { Chest, type ChestItem } from './game/Chest'
 import { studyDay } from '@lernapp/shared'
 import { bossLife, cardLife, isPlayable, shownLife } from '../game/mastery'
 import { ALL_MODULES, loadAreaChoices, loadBossLife, saveBossLife } from '../data/game'
@@ -82,6 +83,8 @@ export function BattleScreen({
   /** Zähler für den Blitz „✨ Fund!“ (neuer Schlüssel = Animation startet neu). */
   const [flash, setFlash] = useState(0)
   const loot = useRef<LootRun>(EMPTY_RUN)
+  /** Ungeöffnete Funde für die Truhe am Kampfende; null = wird geladen. */
+  const [chest, setChest] = useState<ChestItem[] | null>(null)
   const settings = useRef<Settings | null>(null)
   const busy = useRef(false)
   const finished = useRef(false)
@@ -142,6 +145,19 @@ export function BattleScreen({
       // Fürs nächste Mal („hat sich erholt“); ein Fehler darf den Abschluss nicht verhindern.
       if (battle) saveBossLife(lifeKey, battle.hp, now()).catch(() => {})
       onFinished?.(counts.right + counts.partial + counts.wrong)
+      // Truhe: alle noch nicht gezeigten Funde, auch aus abgebrochenen Kämpfen. Erst die Forschung prüfen.
+      void checkResearch(now())
+        .catch(() => 0)
+        .then(() => loadFinds())
+        .then((all) => {
+          const items: ChestItem[] = []
+          for (const f of all) {
+            const item = itemById(f.item)
+            if (!f.opened && item) items.push({ find: f, item, duplicate: isDuplicate(f, all) })
+          }
+          setChest(items)
+        })
+        .catch(() => setChest([]))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done, onFinished])
@@ -179,6 +195,21 @@ export function BattleScreen({
 
   const { boss, name } = bossFor(moduleId, modules, areas)
 
+  if (done && chest === null) return <p className="muted">Lade …</p>
+  if (done && chest && chest.length > 0) {
+    return (
+      <Chest
+        items={chest}
+        onDone={() => {
+          void markOpened(
+            chest.map((c) => c.find.id),
+            now(),
+          ).catch(() => {})
+          setChest([])
+        }}
+      />
+    )
+  }
   if (done) {
     const final = endBattle(battle)
     const lost = final.startHp - final.hp

@@ -35,14 +35,17 @@ describe('BattleScreen', () => {
       expect(await db.states.count()).toBe(i + 1)
       await userEvent.click(await screen.findByRole('button', { name: 'Weiter' }))
     }
+    // Ein Fund (dritte richtige Antwort): erst die Truhe, dann das Ergebnis.
+    await userEvent.click(await screen.findByRole('button', { name: 'Überspringen' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Zum Ergebnis' }))
     expect(await screen.findByText(/20 richtig/)).toBeInTheDocument()
     expect(screen.getByText(/5 falsch/)).toBeInTheDocument()
     expect(screen.getByText(/Pause/)).toBeInTheDocument()
     expect(await db.states.count()).toBe(25)
-    // 25 States + 25 Logs + 1 Fund (dritte richtige Antwort) + das gespeicherte Endleben des Bosses
-    await vi.waitFor(async () => expect(await db.outbox.count()).toBe(52))
+    // 25 States + 25 Logs + 1 Fund (dritte richtige Antwort) + „Truhe geöffnet“ + das gespeicherte Endleben des Bosses
+    await vi.waitFor(async () => expect(await db.outbox.count()).toBe(53))
     expect(onFinished).toHaveBeenCalledTimes(1)
-  })
+  }, 15_000)
 
   it('zeigt bei leerer Warteschlange einen Hinweis', async () => {
     render(<BattleScreen now={() => NOW} rng={seededRng(1)} onExit={vi.fn()} />)
