@@ -11,6 +11,8 @@ export type Answer =
   | { kind: 'matching'; mapping: number[] }
   | { kind: 'order'; order: number[] }
   | { kind: 'free'; text: string }
+  /** Eingetippte Kernantwort; text leer bei „Weiß nicht“, overridden = selbst als richtig gewertet. */
+  | { kind: 'typed'; text: string; matched: boolean; overridden: boolean }
 
 export type QuestionProps<T extends Card['type']> = {
   card: CardOf<T>

@@ -6,6 +6,10 @@ export function describeAnswer(card: Card, answer: Answer): string {
   if (card.type === 'choice' && answer.kind === 'choice') {
     return card.payload.options[answer.index]?.text ?? '(keine Auswahl)'
   }
+  if (card.type === 'choice' && answer.kind === 'typed') {
+    const text = answer.text.trim() || '(weiß nicht)'
+    return answer.overridden ? `${text} (selbst als richtig gewertet)` : text
+  }
   if (card.type === 'cloze' && answer.kind === 'cloze') {
     return card.payload.gaps.map((_, i) => `Lücke ${i + 1}: ${answer.inputs[i]?.trim() || '(leer)'}`).join('; ')
   }

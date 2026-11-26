@@ -1,4 +1,4 @@
-import type { Card } from '@lernapp/shared'
+import { typedAnswers, type Card } from '@lernapp/shared'
 import type { Outcome } from '../srs/grading'
 import type { Answer } from './types'
 
@@ -57,6 +57,32 @@ function Details({ card, answer }: { card: Card; answer: Answer }) {
             <strong>Richtig: {correct.text}</strong>
             <br />
             {correct.why}
+          </p>
+        )}
+      </>
+    )
+  }
+  if (card.type === 'choice' && answer.kind === 'typed') {
+    const correct = card.payload.options.find((o) => o.correct)
+    const solution = typedAnswers(card.payload)?.[0] ?? correct?.text
+    const ok = answer.matched || answer.overridden
+    return (
+      <>
+        <p className={`why ${ok ? 'right' : 'wrong'}`}>
+          <strong>
+            {mark(ok)} Deine Antwort: {answer.text.trim() || '(weiß nicht)'}
+            {answer.overridden && ' (selbst als richtig gewertet)'}
+          </strong>
+        </p>
+        {!answer.matched && (
+          <p className="why right">
+            <strong>Richtig: {solution}</strong>
+            {correct && (
+              <>
+                <br />
+                {correct.why}
+              </>
+            )}
           </p>
         )}
       </>
