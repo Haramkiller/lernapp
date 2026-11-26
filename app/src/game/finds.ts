@@ -145,10 +145,14 @@ export function fertilizer(finds: Find[], levels: Iterable<number>): number {
 
 /* ---------------- Forschung ---------------- */
 
-/** Letzte Wiederholung an einem späteren Lerntag als dem Fundtag und die Karte ist nicht im Wiederlernen. */
+/**
+ * Letzte Wiederholung an einem späteren Lerntag als dem Fundtag, und die Karte steht danach in „Wiederholung“
+ * (richtig gewusst). Eine falsche Antwort lässt sie im Lernen oder Wiederlernen; „Schwer“ auf einer Lernkarte
+ * zählt hier nicht, wird aber im Kampf über die Antwort selbst erforscht.
+ */
 export function researchedByState(find: Find, state: SrsState | undefined): boolean {
   if (!state?.last_review) return false
-  return studyDay(new Date(state.last_review)) > find.foundDay && state.state !== State.Relearning
+  return studyDay(new Date(state.last_review)) > find.foundDay && state.state === State.Review
 }
 
 /** Für gelöschte Karten: an einem späteren Tag sitzt ein Thema des Moduls sicher. */

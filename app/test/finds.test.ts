@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { State } from 'ts-fsrs'
+import { Rating, State } from 'ts-fsrs'
 import {
   EMPTY_RUN,
   FIND_ITEMS,
@@ -21,7 +21,7 @@ import {
   type FindStatus,
 } from '../src/game/finds'
 import { REGIONS, regionForModule } from '../src/game/bosses'
-import { newSrsState } from '../src/srs/scheduler'
+import { newSrsState, review } from '../src/srs/scheduler'
 
 const seq = (...values: number[]) => {
   let i = 0
@@ -138,6 +138,15 @@ describe('Fundstücke', () => {
     expect(researchedByState(f, reviewed(new Date(2026, 2, 11, 5), State.Review))).toBe(true)
     expect(researchedByState(f, reviewed(new Date(2026, 2, 11, 5), State.Relearning))).toBe(false)
     expect(researchedByState(f, undefined)).toBe(false)
+  })
+
+  it('researchedByState: falsche Antwort auf eine Lernkarte am Folgetag erforscht nicht', () => {
+    const f = find({ foundDay: '2026-03-10' })
+    const day1 = new Date(2026, 2, 10, 12)
+    const day2 = new Date(2026, 2, 11, 12)
+    const learned = review(newSrsState(day1), Rating.Good, day1, { cardId: 'c' }).state
+    expect(researchedByState(f, review(learned, Rating.Again, day2, { cardId: 'c' }).state)).toBe(false)
+    expect(researchedByState(f, review(learned, Rating.Good, day2, { cardId: 'c' }).state)).toBe(true)
   })
 
   it('researchedByModule: nur an einem späteren Tag und wenn ein Thema sitzt', () => {

@@ -94,12 +94,17 @@ export async function loadDesign(): Promise<Design> {
   return { placements, soil }
 }
 
-/** Stellt ein Stück auf (oder räumt mit `null` ab); ein Stück steht höchstens an einem Platz. */
+/**
+ * Stellt ein Stück auf (oder räumt mit `null` ab); ein Stück steht höchstens an einem Platz.
+ * Liest die rohen Zeilen: nach einem Sync-Konflikt können ältere Doppel-Einträge des neuen oder des
+ * abgeräumten Stücks liegen, die sonst wieder auftauchen würden. Sie werden mit geleert.
+ */
 export async function placeItem(slotId: string, itemId: string | null, design: Design, now: Date): Promise<void> {
   const at = now.toISOString()
-  if (itemId !== null)
-    for (const [slot, item] of design.placements)
-      if (item === itemId && slot !== slotId) await putGameItem({ id: PLACE + slot, data: { item: null }, updatedAt: at })
+  const affected = new Set([itemId, design.placements.get(slotId)].filter((i): i is string => typeof i === 'string'))
+  for (const r of await rows(PLACE))
+    if (r.id !== PLACE + slotId && typeof r.data.item === 'string' && affected.has(r.data.item))
+      await putGameItem({ id: r.id, data: { item: null }, updatedAt: at })
   await putGameItem({ id: PLACE + slotId, data: { item: itemId }, updatedAt: at })
 }
 

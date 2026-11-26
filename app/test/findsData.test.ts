@@ -99,6 +99,20 @@ describe('Funde in der Spieltabelle', () => {
     expect([...(await loadDesign()).placements]).toEqual([['tuer-links', 'farn']])
   })
 
+  it('nach Sync-Konflikt: Platz leeren oder neu belegen holt das Stück nicht auf den alten Platz zurück', async () => {
+    const conflict = () =>
+      db.game.bulkPut([
+        { id: 'place:gang-links', data: { item: 'farn' }, updatedAt: '2026-03-10T08:00:00.000Z' },
+        { id: 'place:tuer-links', data: { item: 'farn' }, updatedAt: '2026-03-10T09:00:00.000Z' },
+      ])
+    await conflict()
+    await placeItem('tuer-links', null, await loadDesign(), NOW)
+    expect([...(await loadDesign()).placements]).toEqual([])
+    await conflict()
+    await placeItem('tuer-links', 'moosstein', await loadDesign(), NOW)
+    expect([...(await loadDesign()).placements]).toEqual([['tuer-links', 'moosstein']])
+  })
+
   it('raiseSoil: kostet 2/4/6 Dünger, zu wenig wirft', async () => {
     await saveFind(find({ id: '1', item: 'farn', foundAt: '2026-03-10T07:00:00.000Z' }))
     await saveFind(find({ id: '2', item: 'farn', foundAt: '2026-03-10T08:00:00.000Z' }))
