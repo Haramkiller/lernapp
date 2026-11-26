@@ -17,6 +17,8 @@ import { WelcomeFlow } from './ui/WelcomeFlow'
 import { SettingsScreen } from './ui/SettingsScreen'
 import { SetupScreen } from './ui/SetupScreen'
 import { BattleScreen } from './ui/BattleScreen'
+import { CardImportFlow } from './ui/CardImportFlow'
+import { loadModuleContent, loadModules, saveImport } from './data/cardImport'
 
 type Scene = 'greenhouse' | 'camp'
 type View =
@@ -24,6 +26,7 @@ type View =
   | { name: Scene }
   | { name: 'study'; moduleId?: string; rested: boolean }
   | { name: 'settings'; from: Scene }
+  | { name: 'cards'; from: Scene }
 
 const defaultEnv = { url: import.meta.env.VITE_SUPABASE_URL as string | undefined, key: import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined }
 
@@ -210,6 +213,7 @@ export function App({ env = defaultEnv, makeClient = createAppClient, confirm = 
           refreshKey={refreshKey}
           onCamp={() => setView({ name: 'camp' })}
           onSettings={() => setView({ name: 'settings', from: 'greenhouse' })}
+          onCreateCards={() => setView({ name: 'cards', from: 'greenhouse' })}
           onSyncNow={() => void runSync()}
         />
       )}
@@ -219,6 +223,7 @@ export function App({ env = defaultEnv, makeClient = createAppClient, confirm = 
           refreshKey={refreshKey}
           onBattle={(moduleId, rested) => setView({ name: 'study', moduleId, rested })}
           onSettings={() => setView({ name: 'settings', from: 'camp' })}
+          onCreateCards={() => setView({ name: 'cards', from: 'camp' })}
           onSyncNow={() => void runSync()}
           onGreenhouse={() => setView({ name: 'greenhouse' })}
         />
@@ -237,6 +242,22 @@ export function App({ env = defaultEnv, makeClient = createAppClient, confirm = 
           onExit={() => {
             setRefreshKey((k) => k + 1)
             setView({ name: 'camp' })
+          }}
+        />
+      )}
+      {view.name === 'cards' && (
+        <CardImportFlow
+          loadModules={loadModules}
+          loadContent={loadModuleContent}
+          refresh={runSync}
+          save={async (p) => {
+            if (!client) throw new Error('Keine Datenbank eingerichtet')
+            await saveImport(client, p)
+            void runSync()
+          }}
+          onDone={() => {
+            setRefreshKey((k) => k + 1)
+            setView({ name: view.from })
           }}
         />
       )}

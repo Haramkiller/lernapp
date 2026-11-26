@@ -2,7 +2,7 @@
 import 'fake-indexeddb/auto'
 import './setup'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AuthApiError, AuthRetryableFetchError, type AuthChangeEvent, type Session, type SupabaseClient } from '@supabase/supabase-js'
 import { App } from '../../src/App'
@@ -182,6 +182,21 @@ describe('App: Registrierung', () => {
     await signUpAs('a@b.de', 'geheim1')
     expect(await screen.findByText('Schritt 2 von 3')).toBeInTheDocument()
     expect(screen.getByText(/a@b\.de/)).toBeInTheDocument()
+  })
+})
+
+describe('App: Karten erstellen', () => {
+  it('Menü → Karten erstellen öffnet Schritt 1, Zurück führt ins Gewächshaus', async () => {
+    const { client } = fakeClient({ data: { session: session('u1') }, error: null })
+    render(<App env={env} makeClient={() => client} />)
+    await openMenu()
+    // Das Gewächshaus ist leer und hat einen eigenen Knopf; hier zählt der im Menü.
+    const panel = document.querySelector<HTMLElement>('.scene-menu-panel')!
+    await userEvent.click(within(panel).getByRole('button', { name: 'Karten erstellen' }))
+    expect(await screen.findByRole('heading', { name: 'Modul wählen' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Zurück' }))
+    expect(await screen.findByRole('button', { name: 'Menü' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Modul wählen' })).not.toBeInTheDocument()
   })
 })
 

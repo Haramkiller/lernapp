@@ -155,9 +155,23 @@ describe('GreenhouseScreen', () => {
     expect(rule).toContain('min-width: 32px')
   })
 
-  it('ohne Module: Hinweis auf die Werkstatt', async () => {
-    open()
-    expect(await screen.findByText('Noch keine Beete – erstelle Karten in der Werkstatt')).toBeInTheDocument()
+  it('ohne Module: Hinweis und Knopf „Karten erstellen“', async () => {
+    const onCreateCards = vi.fn()
+    open({ onCreateCards })
+    expect(await screen.findByText('Noch keine Beete.')).toBeInTheDocument()
+    expect(screen.queryByText(/Werkstatt/)).not.toBeInTheDocument()
+    // Der Knopf im leeren Gewächshaus (der Menüknopf ist zugeklappt).
+    await userEvent.click(screen.getByRole('button', { name: 'Karten erstellen' }))
+    expect(onCreateCards).toHaveBeenCalledTimes(1)
+  })
+
+  it('Menü: Karten erstellen', async () => {
+    const onCreateCards = vi.fn()
+    await botanik()
+    open({ onCreateCards })
+    await userEvent.click(await btn('Menü'))
+    await userEvent.click(screen.getByRole('button', { name: 'Karten erstellen' }))
+    expect(onCreateCards).toHaveBeenCalledTimes(1)
   })
 
   it('Menü: Einstellungen', async () => {

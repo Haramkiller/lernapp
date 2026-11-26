@@ -80,6 +80,8 @@ Danach startet die App wie eine normale App und funktioniert auch ohne Internet.
 
 **Variante A: gemeinsame Datenbank (einfach).** Du gibst den App-Link weiter. Dein Freund öffnet ihn, registriert sich mit seiner eigenen E-Mail-Adresse und hat seinen eigenen, von deinem getrennten Lernstand. Die App führt Neue selbst durch die Anmeldung: Auf der Startseite ‚Ich bin neu‘ wählen. Nachteil: alle teilen sich dein Gratis-Kontingent bei Supabase. Die Registrierung ist offen: Jeder, der den Link kennt, kann sich auf deiner Datenbank registrieren (er sieht nur seine eigenen Daten). Wenn du das nicht möchtest, schalte in Supabase unter **Authentication** → **Sign In / Providers** die Neuanmeldungen aus (**Allow new users to sign up**).
 
+**Karten ohne Claude-Abo.** Ohne Claude-Abo erstellen Freunde Karten über **Karten erstellen** im Menü: Die App führt Schritt für Schritt durch den kostenlosen Chat auf claude.ai.
+
 **Variante B: eigene Datenbank (unabhängig).**
 1. Dein Freund legt ein eigenes Supabase-Projekt an und führt `supabase/schema.sql` im SQL Editor aus (Abschnitt 1, Schritte 1 bis 7).
 2. Er öffnet den App-Link und tippt auf der Willkommensseite unten auf **Eigene Datenbank verwenden**. Auf der Seite **Einrichtung** trägt er bei **Supabase-URL** die Project URL und bei **Öffentlicher Schlüssel** den anon/publishable-Schlüssel seines Projekts ein und klickt **Speichern**; danach erscheint wieder die Willkommensseite (mit dem Hinweis „Eigene Datenbank: …“). Über denselben Link und **Eingebaute Datenbank verwenden** kommt er zurück zur eingebauten Datenbank. Später ist das auch in den **Einstellungen** im Abschnitt **Eigene Datenbank** möglich (leer lassen = eingebaute Datenbank).

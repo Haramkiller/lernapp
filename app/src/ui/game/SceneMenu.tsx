@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { syncText, type SyncStatus } from '../CampScreen'
 
-type Props = { sync: SyncStatus; dead: number; onSettings: () => void; onSyncNow?: () => void }
+type Props = { sync: SyncStatus; dead: number; onSettings: () => void; onSyncNow?: () => void; onCreateCards?: () => void }
 
 /** Knopf „Menü“ oben rechts in einer Szene; das Panel legt sich darunter über die Szene. */
-export function SceneMenu({ sync, dead, onSettings, onSyncNow }: Props) {
+export function SceneMenu({ sync, dead, onSettings, onSyncNow, onCreateCards }: Props) {
   const [open, setOpen] = useState(false)
   return (
     <>
@@ -19,6 +19,11 @@ export function SceneMenu({ sync, dead, onSettings, onSyncNow }: Props) {
             {onSyncNow && (
               <button type="button" onClick={onSyncNow}>
                 Jetzt synchronisieren
+              </button>
+            )}
+            {onCreateCards && (
+              <button type="button" onClick={onCreateCards}>
+                Karten erstellen
               </button>
             )}
             <button type="button" onClick={onSettings}>
