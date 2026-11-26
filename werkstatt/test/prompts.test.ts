@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Card } from '@lernapp/shared'
-import { scriptPrompt, examPrompt, askPrompt } from '../src/prompts'
+import { scriptPrompt, examPrompt, askPrompt, typedPrompt } from '../src/prompts'
 
 const chunk = { path: 'C:/w/tmp/skript-16-30.pdf', firstPage: 16, lastPage: 30 }
 
@@ -38,5 +38,15 @@ describe('Prompts', () => {
     expect(p).toContain('Was ist Xylem?')
     expect(p).toContain('keine Ahnung')
     expect(p).toContain('Hilf mir')
+  })
+})
+
+describe('typedPrompt', () => {
+  it('enthält jede ID, jede Frage und das Feld "typed"', () => {
+    const p = typedPrompt([
+      { id: 'id-1', question: 'Wo entsteht ATP?', answer: 'Mitochondrien', why: 'Zellatmung.' },
+      { id: 'id-2', question: 'Warum ist der Himmel blau?', answer: 'Streuung', why: 'Rayleigh.' },
+    ])
+    for (const s of ['id-1', 'id-2', 'Wo entsteht ATP?', 'Warum ist der Himmel blau?', '"typed"', '"items"']) expect(p).toContain(s)
   })
 })

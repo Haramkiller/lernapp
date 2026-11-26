@@ -5,16 +5,17 @@ import { mkdirSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { dirname, extname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { CardDraftSchema, normalize, type Card, type CardDraft, type Topic } from '@lernapp/shared'
+import { CardDraftSchema, TypedSchema, normalize, type Card, type CardDraft, type Topic } from '@lernapp/shared'
 import { markExamRelevant } from './examRelevance'
 import { parseGeneration } from './parse'
-import { askPrompt, examPrompt, scriptPrompt } from './prompts'
+import { askPrompt, examPrompt, scriptPrompt, typedPrompt } from './prompts'
 import { SCANNED_NOTICE, type PdfChunk } from './pdf'
 import type { runClaude as RunClaude } from './claude'
 import type { Gateway } from './supabase'
 
 export const DEFAULT_APP_ORIGIN = 'https://placeholder.github.io'
 const BATCH = 200
+const TYPED_BATCH = 25
 const MAX_UPLOAD = 100 * 1024 * 1024
 const SESSION_COOKIE = 'werkstatt_sitzung'
 
@@ -53,6 +54,10 @@ interface Job {
   error?: string
   /** Hinweis ohne Fehler, z. B. bei gescannten PDFs. */
   notice?: string
+  /** Kernantworten-Lauf: Anzahl geschriebener Karten. */
+  updated?: number
+  /** Abbrechen angefordert: Lauf stoppt vor dem nächsten Stapel. */
+  cancelled?: boolean
 }
 
 class HttpError extends Error {
@@ -332,6 +337,77 @@ export function createServer(deps: ServerDeps) {
     const job = jobs.get(String(req.params.id))
     if (!job) return void res.status(404).json({ error: 'Auftrag nicht gefunden.' })
     res.json(job)
+  })
+
+  app.post('/api/jobs/:id/cancel', guard, (req: Request, res: Response) => {
+    const job = jobs.get(String(req.params.id))
+    if (!job) return void res.status(404).json({ error: 'Auftrag nicht gefunden.' })
+    job.cancelled = true
+    res.json({ ok: true })
+  })
+
+  // --- Kernantworten ergänzen --------------------------------------------------------------------
+
+  type ChoiceCard = Extract<Card, { type: 'choice' }>
+
+  /** Ein Stapel: Claude fragen, Antwort prüfen, nur „typed“ (+ updatedAt) zurückschreiben. Gibt die Zahl geschriebener Karten zurück. */
+  async function typedBatch(batch: ChoiceCard[]): Promise<number> {
+    const input = batch.map((c) => {
+      const right = c.payload.options.find((o) => o.correct)
+      return { id: c.id, question: c.payload.question, answer: right?.text ?? '', why: right?.why ?? '' }
+    })
+    const raw = await deps.runClaude(typedPrompt(input), { addDir: askDir })
+    const start = raw.indexOf('{')
+    const end = raw.lastIndexOf('}')
+    if (start < 0 || end < start) throw new Error('Antwort enthielt kein JSON.')
+    const parsed = JSON.parse(raw.slice(start, end + 1)) as { items?: unknown }
+    if (!Array.isArray(parsed.items)) throw new Error('Antwort ohne "items".')
+    const byId = new Map(batch.map((c) => [c.id, c]))
+    const now = new Date().toISOString()
+    const out = new Map<string, Card>()
+    for (const item of parsed.items as { id?: unknown; typed?: unknown }[]) {
+      const card = typeof item?.id === 'string' ? byId.get(item.id) : undefined
+      if (!card || !('typed' in item)) continue
+      const typed = item.typed === null ? null : TypedSchema.safeParse(item.typed)
+      if (typed !== null && !typed.success) continue
+      out.set(card.id, { ...card, payload: { ...card.payload, typed: typed === null ? null : typed.data }, updatedAt: now })
+    }
+    if (out.size) await gw().upsertCards([...out.values()])
+    return out.size
+  }
+
+  async function runTyped(job: Job) {
+    const modules = await gw().listModules()
+    const todo: ChoiceCard[] = []
+    for (const m of modules) {
+      for (const c of await gw().listCards(m.id)) {
+        if (!c.deleted && c.type === 'choice' && c.payload.typed === undefined) todo.push(c)
+      }
+    }
+    job.progress = { done: 0, total: todo.length }
+    const errors: string[] = []
+    for (const batch of batches(todo, TYPED_BATCH)) {
+      if (job.cancelled) break
+      try {
+        job.updated = (job.updated ?? 0) + (await typedBatch(batch))
+      } catch (e) {
+        errors.push(errMsg(e))
+        job.error = `${errors.length} Stapel übersprungen: ${errors.join('; ')}`
+      }
+      job.progress.done += batch.length
+    }
+    job.status = 'done'
+  }
+
+  app.post('/api/typed', guard, (_req: Request, res: Response) => {
+    const jobId = randomUUID()
+    const job: Job = { status: 'running', progress: { done: 0, total: 0 }, updated: 0 }
+    jobs.set(jobId, job)
+    void runTyped(job).catch((e) => {
+      job.status = 'error'
+      job.error = errMsg(e)
+    })
+    res.json({ jobId })
   })
 
   // --- Übernehmen --------------------------------------------------------------------------------

@@ -452,3 +452,118 @@ describe('CORS', () => {
     expect(bad.status).toBe(403)
   })
 })
+
+const wcard = (id: string, typed?: unknown, over: Partial<Card> = {}): Card =>
+  ({
+    id,
+    moduleId: 'm1',
+    topicId: 't1',
+    type: 'choice',
+    payload: {
+      question: `Frage ${id}?`,
+      options: [
+        { text: 'ATP', correct: true, why: 'Energie.' },
+        { text: 'B', correct: false, why: 'Nein.' },
+        { text: 'C', correct: false, why: 'Nein.' },
+        { text: 'D', correct: false, why: 'Nein.' },
+      ],
+      ...(typed === undefined ? {} : { typed }),
+    },
+    explanation: 'Weil.',
+    source: null,
+    examRelevant: false,
+    fromExam: false,
+    difficulty: 1,
+    deleted: false,
+    createdAt: '2020-01-01T00:00:00.000Z',
+    updatedAt: '2020-01-01T00:00:00.000Z',
+    ...over,
+  }) as Card
+
+const clozeW = (): Card =>
+  ({ ...wcard('z'), type: 'cloze', payload: { text: 'Ein {{1}}.', gaps: [{ answers: ['x'] }] } }) as Card
+
+describe('Kernantworten ergänzen', () => {
+  const cards = () => [wcard('a'), wcard('b', null), wcard('c', { answers: ['X'] }), clozeW()]
+
+  it('fragt nur Auswahlkarten ohne typed an und schreibt nur typed zurück', async () => {
+    const runClaude = vi.fn(async () => JSON.stringify({ items: [{ id: 'a', typed: { answers: ['ATP'] } }] }))
+    const { app, calls, deps } = setup({ runClaude }, { cards: cards() })
+    await login(app)
+    const r = await request(app).post('/api/typed').expect(200)
+    const job = await waitJob(app, r.body.jobId)
+    expect(job).toMatchObject({ status: 'done', updated: 1, progress: { done: 1, total: 1 } })
+    expect(runClaude).toHaveBeenCalledTimes(1)
+    const [prompt, opts] = runClaude.mock.calls[0] as unknown as [string, object]
+    expect(prompt).toContain('Frage a?')
+    expect(prompt).not.toContain('Frage b?')
+    expect(prompt).not.toContain('Frage c?')
+    expect(opts).toEqual({ addDir: join(deps.uploadDir!, 'ask-empty') })
+    expect(calls.upsertCards).toHaveLength(1)
+    const [written] = calls.upsertCards[0]!
+    const orig = wcard('a')
+    expect(written).toEqual({ ...orig, payload: { ...orig.payload, typed: { answers: ['ATP'] } }, updatedAt: written!.updatedAt })
+    expect(written!.updatedAt).not.toBe(orig.updatedAt)
+  })
+
+  it('ignoriert fremde IDs und ungültige Kernantworten', async () => {
+    const runClaude = vi.fn(async () =>
+      JSON.stringify({ items: [{ id: 'fremd', typed: { answers: ['X'] } }, { id: 'a', typed: { answers: [] } }] }),
+    )
+    const { app, calls } = setup({ runClaude }, { cards: cards() })
+    await login(app)
+    const job = await waitJob(app, (await request(app).post('/api/typed').expect(200)).body.jobId)
+    expect(job).toMatchObject({ status: 'done', updated: 0 })
+    expect(calls.upsertCards.flat()).toHaveLength(0)
+  })
+
+  it('schreibt typed: null für Fragen ohne Kurzantwort', async () => {
+    const runClaude = vi.fn(async () => 'Hier: ' + JSON.stringify({ items: [{ id: 'a', typed: null }] }))
+    const { app, calls } = setup({ runClaude }, { cards: cards() })
+    await login(app)
+    const job = await waitJob(app, (await request(app).post('/api/typed').expect(200)).body.jobId)
+    expect(job.updated).toBe(1)
+    expect((calls.upsertCards[0]![0]!.payload as { typed: unknown }).typed).toBeNull()
+  })
+
+  it('ein fehlgeschlagener Stapel wird übersprungen, der nächste trotzdem geschrieben', async () => {
+    const many = Array.from({ length: 26 }, (_, i) => wcard(`k${String(i).padStart(2, '0')}`))
+    let n = 0
+    const runClaude = vi.fn(async (prompt: string) => {
+      if (n++ === 0) throw new Error('Claude weg')
+      const ids = many.map((c) => c.id).filter((id) => prompt.includes(`"${id}"`))
+      return JSON.stringify({ items: ids.map((id) => ({ id, typed: { answers: ['ATP'] } })) })
+    })
+    const { app, calls } = setup({ runClaude }, { cards: many })
+    await login(app)
+    const job = await waitJob(app, (await request(app).post('/api/typed').expect(200)).body.jobId)
+    expect(job.status).toBe('done')
+    expect(job.error).toMatch(/Claude weg/)
+    expect(job.updated).toBe(1)
+    expect(job.progress).toEqual({ done: 26, total: 26 })
+    expect(calls.upsertCards.flat().map((c) => c.id)).toEqual(['k25'])
+  })
+
+  it('Abbrechen startet keinen weiteren Stapel', async () => {
+    const many = Array.from({ length: 26 }, (_, i) => wcard(`k${i}`))
+    let release!: () => void
+    const runClaude = vi.fn(
+      () => new Promise<string>((res) => (release = () => res(JSON.stringify({ items: [] })))),
+    )
+    const { app } = setup({ runClaude }, { cards: many })
+    await login(app)
+    const id = (await request(app).post('/api/typed').expect(200)).body.jobId
+    await vi.waitFor(() => expect(runClaude).toHaveBeenCalledTimes(1))
+    await request(app).post(`/api/jobs/${id}/cancel`).expect(200, { ok: true })
+    release()
+    const job = await waitJob(app, id)
+    expect(job.status).toBe('done')
+    expect(runClaude).toHaveBeenCalledTimes(1)
+  })
+
+  it('verlangt Login', async () => {
+    const { app } = setup({}, { cards: cards() })
+    await request(app, null).post('/api/typed').expect(401)
+    await request(app, null).post('/api/jobs/x/cancel').expect(401)
+  })
+})

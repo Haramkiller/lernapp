@@ -78,3 +78,20 @@ ${hist}
 
 Antworte auf Deutsch, kurz und verständlich (max. 6 Sätze), ohne die Frage unnötig zu wiederholen. Wenn die Karte eine Quelle nennt, verweise auf die Seite. Antworte mit reinem Text, nicht als JSON.`
 }
+
+/** Auftrag für „Kernantworten ergänzen“: nur aus Frage, richtiger Option und Begründung, keine PDFs. */
+export function typedPrompt(cards: { id: string; question: string; answer: string; why: string }[]): string {
+  return `Du ergänzt vorhandene Auswahl-Lernkarten um eine kurze Kernantwort zum Eintippen.
+
+Für jede Karte unten bekommst du die Frage, den Text der richtigen Option und deren Begründung.
+Regel (dieselbe wie beim Erzeugen neuer Karten):
+"typed": { "answers": ["Hauptlösung", "Variante", …] } – die kurze Kernantwort (ein Begriff oder eine knappe Wortgruppe, höchstens etwa 4 Wörter); "answers"[0] ist die Hauptlösung, danach gängige Varianten (Singular/Plural, Fachwort/deutsches Wort, Abkürzung, andere Schreibweise). Hat die Frage keine sinnvolle Kurzantwort (z. B. „Warum …?“ oder eine ganze Satz-Antwort), setze "typed": null.
+Erfinde nichts, was nicht aus Frage, Antwort und Begründung hervorgeht. Alles auf Deutsch. Lies keine Dateien.
+
+Karten:
+${JSON.stringify(cards, null, 2)}
+
+Antwortformat: Antworte AUSSCHLIESSLICH mit einem einzigen JSON-Objekt, ohne Text davor oder danach und ohne Codeblock:
+{ "items": [ { "id": "<id der Karte>", "typed": { "answers": ["…"] } }, { "id": "<id>", "typed": null } ] }
+Jede Karte genau einmal, mit unveränderter "id".`
+}
