@@ -1617,6 +1617,9 @@ button.cta:disabled {
 .pending-list .hint {
   overflow-wrap: anywhere;
 }
+.find-region {
+  margin-top: 10px;
+}
 .find-region h2 {
   margin: 0 0 6px;
   font-size: 0.95rem;
@@ -1758,15 +1761,16 @@ button.cta:disabled {
   pointer-events: none;
 }
 .daylight.phase-morgen {
-  background: rgba(170, 210, 255, 0.18);
-  mix-blend-mode: soft-light;
+  background: linear-gradient(to bottom, rgba(110, 160, 230, 0.3), rgba(230, 170, 200, 0.12));
+  mix-blend-mode: screen;
 }
 .daylight.phase-tag {
-  background: transparent;
+  background: rgba(255, 235, 190, 0.2);
+  mix-blend-mode: screen;
 }
 .daylight.phase-abend {
-  background: rgba(255, 170, 60, 0.22);
-  mix-blend-mode: soft-light;
+  background: linear-gradient(to bottom, rgba(255, 140, 40, 0.5), rgba(200, 60, 90, 0.25));
+  mix-blend-mode: overlay;
 }
 .daylight.phase-nacht {
   background: rgba(20, 30, 90, 0.38);
