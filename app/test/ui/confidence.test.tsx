@@ -51,6 +51,13 @@ describe('Sicher / Unsicher', () => {
     expect(onAnswer).toHaveBeenCalledWith('right', { kind: 'typed', text: 'Ribosomen', matched: false, overridden: true }, 'sure')
   })
 
+  it('„Fertig“-Taste (Enter) schließt nur die Tastatur: Feld verliert den Fokus', async () => {
+    render(<Typed card={typedCard()} onAnswer={vi.fn()} />)
+    const field = screen.getByRole('textbox', { name: 'Deine Antwort' })
+    await userEvent.type(field, 'Mito{Enter}')
+    expect(field).not.toHaveFocus()
+  })
+
   it('Eintippen: „Weiß nicht“ ist falsch und unsicher', async () => {
     const onAnswer = vi.fn()
     render(<Typed card={typedCard()} onAnswer={onAnswer} />)

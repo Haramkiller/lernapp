@@ -74,7 +74,9 @@ export const isPermanentError = (e: unknown): boolean => e instanceof RemoteErro
 function toError(error: { message: string; code?: string }, status: number): RemoteError {
   const dataError = status === 400 || status === 409 || status === 422 || /^23/.test(error.code ?? '')
   const authError = status === 401 || status === 403
-  return new RemoteError(error.message, dataError && !authError)
+  // Fehlende Spalte (Schema-Änderung noch nicht gelaufen oder Schema-Cache veraltet): warten statt aussortieren.
+  const schemaError = error.code === 'PGRST204' || error.code === '42703'
+  return new RemoteError(error.message, dataError && !authError && !schemaError)
 }
 
 const PAGE = 1000

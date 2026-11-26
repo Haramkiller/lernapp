@@ -34,7 +34,11 @@ export function Cloze({ card, onAnswer }: QuestionProps<'cloze'>) {
   const placeholdersOk = found.length === gaps.length && found.every((n, i) => n === i + 1)
 
   // Enter schickt nicht ab: man soll sich bewusst für „Sicher“ oder „Unsicher“ entscheiden.
-  const noSubmit = (e: FormEvent) => e.preventDefault()
+  // Die Handy-Taste „Fertig“ schließt nur die Tastatur.
+  const noSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    ;(document.activeElement as HTMLElement | null)?.blur()
+  }
   const check = (c: Confidence) => {
     const { perGap, outcome } = checkCloze(inputs, card.payload)
     onAnswer(outcome, { kind: 'cloze', inputs, perGap }, c)

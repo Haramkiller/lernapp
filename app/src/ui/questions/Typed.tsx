@@ -15,7 +15,11 @@ export function Typed({ card, onAnswer }: QuestionProps<'choice'>) {
   const [missed, setMissed] = useState<Confidence | null>(null)
 
   // Enter schickt nicht ab: man soll sich bewusst für „Sicher“ oder „Unsicher“ entscheiden.
-  const noSubmit = (e: FormEvent) => e.preventDefault()
+  // Die Handy-Taste „Fertig“ schließt nur die Tastatur.
+  const noSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    ;(document.activeElement as HTMLElement | null)?.blur()
+  }
   const check = (c: Confidence) => {
     if (missed || !text.trim()) return
     if (checkTyped(text, answers)) onAnswer('right', { kind: 'typed', text, matched: true, overridden: false }, c)

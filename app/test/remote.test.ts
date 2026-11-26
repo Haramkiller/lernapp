@@ -102,6 +102,10 @@ describe('Fehlerklassifikation', () => {
   it.each([0, 401, 403, 404, 408, 429, 500, 503])('%i ist vorübergehend', async (s) => {
     await expect(push(s)).rejects.toMatchObject({ permanent: false })
   })
+  it('fehlende Spalte (PGRST204 / 42703, Schema noch nicht aktuell) ist vorübergehend', async () => {
+    await expect(push(400, 'PGRST204')).rejects.toMatchObject({ permanent: false })
+    await expect(push(400, '42703')).rejects.toMatchObject({ permanent: false })
+  })
   it('RLS-Verstoß (403, 42501) ist vorübergehend', async () => {
     await expect(push(403, '42501')).rejects.toMatchObject({ permanent: false })
   })

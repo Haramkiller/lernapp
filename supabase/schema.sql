@@ -129,6 +129,8 @@ create index if not exists review_logs_user_synced_idx on public.review_logs (us
 drop trigger if exists review_logs_synced_insert on public.review_logs;
 create trigger review_logs_synced_insert before insert on public.review_logs
   for each row execute function public.set_synced_at();
+-- Schema-Cache der API sofort neu laden, damit die neuen Spalten gleich angenommen werden.
+notify pgrst, 'reload schema';
 
 -- Row Level Security: je Tabelle und Operation eine Policy (nur eigene Zeilen).
 alter table public.modules enable row level security;
