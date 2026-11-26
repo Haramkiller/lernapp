@@ -12,7 +12,7 @@ import { studyDay } from '@lernapp/shared'
 import { bossLife, cardLife, isPlayable, isTypedReady, shownLife } from '../game/mastery'
 import { ALL_MODULES, loadAreaChoices, loadBossLife, saveBossLife } from '../data/game'
 import { buildQueue, newDoneKey, type Settings } from '../session/queue'
-import { toRating, type Outcome } from '../srs/grading'
+import { toRating, type Confidence, type Outcome } from '../srs/grading'
 import { newSrsState, review, type SrsState } from '../srs/scheduler'
 import { ErrorBoundary } from './ErrorBoundary'
 import { Feedback } from './Feedback'
@@ -45,6 +45,8 @@ type Props = {
 }
 
 type Counts = Record<Outcome, number>
+/** Treffsicherheit in diesem Kampf: wie oft „sicher“/„unsicher“ richtig war (teilweise zählt nicht als richtig). */
+type Calibration = Record<Confidence, { right: number; total: number }>
 type Recovery = { from: number; to: number }
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
@@ -71,8 +73,9 @@ export function BattleScreen({
   const [modules, setModules] = useState<Module[]>([])
   const [areas, setAreas] = useState<AreaChoices>(new Map())
   const [index, setIndex] = useState(0)
-  const [result, setResult] = useState<{ outcome: Outcome; answer: Answer } | null>(null)
+  const [result, setResult] = useState<{ outcome: Outcome; answer: Answer; confidence: Confidence | null } | null>(null)
   const [counts, setCounts] = useState<Counts>({ right: 0, partial: 0, wrong: 0 })
+  const [calib, setCalib] = useState<Calibration>({ sure: { right: 0, total: 0 }, unsure: { right: 0, total: 0 } })
   const [battle, setBattle] = useState<Battle | null>(null)
   const [recovery, setRecovery] = useState<Recovery | null>(null)
   const [turn, setTurn] = useState(0)
@@ -230,6 +233,8 @@ export function BattleScreen({
         <p className="summary">
           {counts.right} richtig, {counts.partial} teilweise, {counts.wrong} falsch
         </p>
+        {calib.sure.total > 0 && <p className="calibration">{`Sicher: ${calib.sure.right} von ${calib.sure.total} richtig`}</p>}
+        {calib.unsure.total > 0 && <p className="calibration">{`Unsicher: ${calib.unsure.right} von ${calib.unsure.total} richtig`}</p>}
         <p>Höchste Combo: {final.bestCombo}</p>
         {skippedInvalid > 0 && <p className="muted">{skippedInvalid} fehlerhafte Karte(n) wurden übersprungen.</p>}
         <p>Mach jetzt eine kurze Pause: trink etwas, beweg dich, dann geht es frisch weiter.</p>
@@ -242,7 +247,7 @@ export function BattleScreen({
 
   const card = cards[index]!
 
-  const answer = async (outcome: Outcome, detail: Answer) => {
+  const answer = async (outcome: Outcome, detail: Answer, confidence: Confidence | null) => {
     if (busy.current) return
     busy.current = true
     setSaving(true)
@@ -254,7 +259,8 @@ export function BattleScreen({
       // Der Ausgangs-State wird beim Speichern frisch aus der Datenbank gelesen (ein Sync kann ihn geändert haben).
       const res = await recordReview(card.id, (p) => {
         prev = p
-        return review(p ?? newSrsState(t), toRating(outcome), t, { cardId: card.id, retention })
+        const r = review(p ?? newSrsState(t), toRating(outcome, confidence), t, { cardId: card.id, retention })
+        return confidence ? { ...r, log: { ...r.log, confidence, outcome } } : r
       })
       // Erst eine gespeicherte Antwort zählt im Kampf.
       const before = cardLife(prev, t, retention)
@@ -285,7 +291,10 @@ export function BattleScreen({
       if (outcome !== 'wrong') researchByAnswer(card.id, t).catch(() => {})
       setTurn((n) => n + 1)
       setCounts((c) => ({ ...c, [outcome]: c[outcome] + 1 }))
-      setResult({ outcome, answer: detail })
+      if (confidence) {
+        setCalib((c) => ({ ...c, [confidence]: { right: c[confidence].right + (outcome === 'right' ? 1 : 0), total: c[confidence].total + 1 } }))
+      }
+      setResult({ outcome, answer: detail, confidence })
     } catch (e) {
       setSaveError(`Die Antwort konnte nicht gespeichert werden: ${message(e)}. Bitte versuche es erneut.`)
     } finally {
@@ -327,7 +336,7 @@ export function BattleScreen({
         )}
         <ErrorBoundary key={card.id} onSkip={next}>
           {result ? (
-            <Feedback card={card} outcome={result.outcome} answer={result.answer} onNext={next} onAsk={renderAsk ? () => setAsking(true) : undefined} />
+            <Feedback card={card} outcome={result.outcome} confidence={result.confidence} answer={result.answer} onNext={next} onAsk={renderAsk ? () => setAsking(true) : undefined} />
           ) : (
             <Question card={card} typed={typedIds.has(card.id)} rng={rng} onAnswer={answer} />
           )}
@@ -340,7 +349,7 @@ export function BattleScreen({
   )
 }
 
-function Question({ card, typed, rng, onAnswer }: { card: Card; typed: boolean; rng: Rng; onAnswer: (o: Outcome, a: Answer) => void }) {
+function Question({ card, typed, rng, onAnswer }: { card: Card; typed: boolean; rng: Rng; onAnswer: (o: Outcome, a: Answer, c: Confidence | null) => void }) {
   switch (card.type) {
     case 'choice':
       if (typed) return <Typed card={card} onAnswer={onAnswer} />

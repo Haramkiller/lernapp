@@ -1,5 +1,5 @@
 import { typedAnswers, type Card } from '@lernapp/shared'
-import type { Outcome } from '../srs/grading'
+import type { Confidence, Outcome } from '../srs/grading'
 import type { Answer } from './types'
 
 const TITLE: Record<Outcome, string> = {
@@ -12,6 +12,8 @@ export type FeedbackProps = {
   card: Card
   outcome: Outcome
   answer: Answer
+  /** Einschätzung vor dem Aufdecken (null/fehlt: keine). */
+  confidence?: Confidence | null
   onNext: () => void
   /** Task 9: „Nachfragen“-Knopf. Ohne diese Funktion wird nichts angezeigt. */
   onAsk?: () => void
@@ -167,7 +169,15 @@ function Details({ card, answer }: { card: Card; answer: Answer }) {
   return null
 }
 
-export function Feedback({ card, outcome, answer, onNext, onAsk }: FeedbackProps) {
+/** Hinweis zur Einschätzung: Überraschung bei „sicher, aber falsch“ hervorheben (bleibt besser hängen). */
+function ConfidenceHint({ outcome, confidence }: { outcome: Outcome; confidence?: Confidence | null }) {
+  if (confidence === 'sure' && outcome === 'wrong') return <p className="surprise">Du warst dir sicher – genau diese Stelle merken.</p>
+  if (confidence === 'sure' && outcome === 'partial') return <p className="surprise soft">Du warst dir sicher, aber es fehlt noch etwas.</p>
+  if (confidence === 'unsure' && outcome === 'right') return <p className="muted">Richtig, aber unsicher – kommt etwas früher wieder.</p>
+  return null
+}
+
+export function Feedback({ card, outcome, answer, confidence, onNext, onAsk }: FeedbackProps) {
   return (
     <section className={`feedback ${outcome}`} aria-live="polite">
       <h2 className="pixel feedback-title">
@@ -176,6 +186,7 @@ export function Feedback({ card, outcome, answer, onNext, onAsk }: FeedbackProps
         </span>
         {TITLE[outcome]}
       </h2>
+      <ConfidenceHint outcome={outcome} confidence={confidence} />
       <p className="question">{questionOf(card)}</p>
       <Details card={card} answer={answer} />
       {card.explanation && <p className="explanation">{card.explanation}</p>}

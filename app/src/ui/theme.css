@@ -1849,3 +1849,17 @@ button.link.dont-know {
   margin: 4px auto 0;
   padding: 8px 12px;
 }
+
+/* Hinweis „sicher, aber falsch“ in der Rückmeldung */
+.feedback .surprise {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border: 2px solid var(--partial);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  font-weight: 650;
+}
+.feedback .surprise.soft {
+  border-style: dashed;
+  font-weight: 500;
+}

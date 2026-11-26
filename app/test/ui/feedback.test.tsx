@@ -61,4 +61,12 @@ describe('Feedback', () => {
     expect(screen.getByText('Wasser geht durch.')).toBeInTheDocument()
     expect(screen.getByText('Wasser wandert durch die Membran.')).toBeInTheDocument()
   })
+
+  it('Sicher, aber falsch: auffälliger Hinweis; sicher und teilweise: schwächer', () => {
+    const { unmount } = render(<Feedback card={choiceCard('c1')} outcome="wrong" confidence="sure" answer={{ kind: 'choice', index: 2 }} onNext={vi.fn()} />)
+    expect(screen.getByText('Du warst dir sicher – genau diese Stelle merken.')).toBeInTheDocument()
+    unmount()
+    render(<Feedback card={clozeCard('z1')} outcome="partial" confidence="sure" answer={{ kind: 'cloze', inputs: ['x'], perGap: [false] }} onNext={vi.fn()} />)
+    expect(screen.getByText('Du warst dir sicher, aber es fehlt noch etwas.')).toBeInTheDocument()
+  })
 })
