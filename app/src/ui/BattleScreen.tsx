@@ -9,7 +9,7 @@ import { EMPTY_RUN, countsForLoot, isDuplicate, itemById, nextDrops, rollFind, t
 import { checkResearch, loadFinds, markOpened, researchByAnswer, saveFind } from '../data/finds'
 import { Chest, type ChestItem } from './game/Chest'
 import { studyDay } from '@lernapp/shared'
-import { bossLife, cardLife, isPlayable, shownLife } from '../game/mastery'
+import { bossLife, cardLife, isPlayable, isTypedReady, shownLife } from '../game/mastery'
 import { ALL_MODULES, loadAreaChoices, loadBossLife, saveBossLife } from '../data/game'
 import { buildQueue, newDoneKey, type Settings } from '../session/queue'
 import { toRating, type Outcome } from '../srs/grading'
@@ -22,6 +22,7 @@ import { Cloze } from './questions/Cloze'
 import { Free } from './questions/Free'
 import { Matching } from './questions/Matching'
 import { Order } from './questions/Order'
+import { Typed } from './questions/Typed'
 import type { Rng } from './random'
 import type { Answer } from './types'
 
@@ -65,6 +66,8 @@ export function BattleScreen({
   validate = isPlayable,
 }: Props) {
   const [cards, setCards] = useState<Card[] | null>(null)
+  // Karten, die in diesem Kampf eingetippt werden (fest ab dem Laden, gemessen am Stand vor der Antwort).
+  const [typedIds, setTypedIds] = useState<Set<string>>(new Set())
   const [modules, setModules] = useState<Module[]>([])
   const [areas, setAreas] = useState<AreaChoices>(new Map())
   const [index, setIndex] = useState(0)
@@ -117,6 +120,7 @@ export function BattleScreen({
         setAreas(chosen)
         setSkippedInvalid(inScope.length - valid.length)
         setCards(ids.map((id) => byId.get(id)!))
+        setTypedIds(new Set(ids.filter((id) => isTypedReady(byId.get(id)!, map.get(id)))))
         // Boss-Leben über alle abfragbaren Karten im Umfang, nicht nur über die heutige Lernliste.
         const life = bossLife(valid, map, t, s.retention)
         const shown = shownLife(life.hp)
@@ -325,7 +329,7 @@ export function BattleScreen({
           {result ? (
             <Feedback card={card} outcome={result.outcome} answer={result.answer} onNext={next} onAsk={renderAsk ? () => setAsking(true) : undefined} />
           ) : (
-            <Question card={card} rng={rng} onAnswer={answer} />
+            <Question card={card} typed={typedIds.has(card.id)} rng={rng} onAnswer={answer} />
           )}
         </ErrorBoundary>
         {/* Eigener Schlüssel: renderAsk darf selbst key={card.id} setzen, ohne mit der ErrorBoundary zu kollidieren
@@ -336,9 +340,10 @@ export function BattleScreen({
   )
 }
 
-function Question({ card, rng, onAnswer }: { card: Card; rng: Rng; onAnswer: (o: Outcome, a: Answer) => void }) {
+function Question({ card, typed, rng, onAnswer }: { card: Card; typed: boolean; rng: Rng; onAnswer: (o: Outcome, a: Answer) => void }) {
   switch (card.type) {
     case 'choice':
+      if (typed) return <Typed card={card} onAnswer={onAnswer} />
       return <Choice card={card} rng={rng} onAnswer={onAnswer} />
     case 'cloze':
       return <Cloze card={card} onAnswer={onAnswer} />
