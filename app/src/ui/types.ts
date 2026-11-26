@@ -1,5 +1,5 @@
 import type { Card } from '@lernapp/shared'
-import type { Outcome } from '../srs/grading'
+import type { Confidence, Outcome } from '../srs/grading'
 import type { Rng } from './random'
 
 export type CardOf<T extends Card['type']> = Extract<Card, { type: T }>
@@ -16,6 +16,7 @@ export type Answer =
 
 export type QuestionProps<T extends Card['type']> = {
   card: CardOf<T>
-  onAnswer: (outcome: Outcome, answer: Answer) => void
+  /** confidence: Einschätzung vor dem Aufdecken; null bei freien Antworten (dort bewertet man sich selbst). */
+  onAnswer: (outcome: Outcome, answer: Answer, confidence: Confidence | null) => void
 }
 export type ShuffledQuestionProps<T extends Card['type']> = QuestionProps<T> & { rng: Rng }

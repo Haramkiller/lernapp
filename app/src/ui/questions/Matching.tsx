@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { checkMatching } from '../../answers/check'
 import { shuffledIndices } from '../random'
 import type { ShuffledQuestionProps } from '../types'
-import { AnswerBar } from './AnswerBar'
+import { ConfidenceBar } from './ConfidenceBar'
 
 /** Kacheln statt Auswahllisten: links antippen, dann rechts. Jedes Paar bekommt eine eigene Farbe. */
 export function Matching({ card, rng, onAnswer }: ShuffledQuestionProps<'matching'>) {
@@ -65,9 +65,9 @@ export function Matching({ card, rng, onAnswer }: ShuffledQuestionProps<'matchin
           })}
         </div>
       </div>
-      <AnswerBar
+      <ConfidenceBar
         disabled={!complete}
-        onClick={() => onAnswer(checkMatching(choice, card.payload), { kind: 'matching', mapping: choice })}
+        onPick={(c) => onAnswer(checkMatching(choice, card.payload), { kind: 'matching', mapping: choice }, c)}
       />
     </section>
   )

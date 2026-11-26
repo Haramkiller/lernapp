@@ -12,14 +12,14 @@ import { seededRng } from '../../src/ui/random'
 import { choiceCard, clozeCard, freeCard, matchingCard, orderCard } from './fixtures'
 
 describe('Choice', () => {
-  const check = () => userEvent.click(screen.getByRole('button', { name: 'Prüfen' }))
+  const check = () => userEvent.click(screen.getByRole('button', { name: 'Sicher' }))
 
   it('meldet die Wahl einer falschen Option mit Originalindex', async () => {
     const onAnswer = vi.fn()
     render(<Choice card={choiceCard('c1')} rng={seededRng(1)} onAnswer={onAnswer} />)
     await userEvent.click(screen.getByRole('button', { name: /Falsch C/ }))
     await check()
-    expect(onAnswer).toHaveBeenCalledWith('wrong', { kind: 'choice', index: 2 })
+    expect(onAnswer).toHaveBeenCalledWith('wrong', { kind: 'choice', index: 2 }, 'sure')
   })
 
   it('richtige Option → right', async () => {
@@ -27,13 +27,13 @@ describe('Choice', () => {
     render(<Choice card={choiceCard('c1')} rng={seededRng(7)} onAnswer={onAnswer} />)
     await userEvent.click(screen.getByRole('button', { name: /Richtig B/ }))
     await check()
-    expect(onAnswer).toHaveBeenCalledWith('right', { kind: 'choice', index: 1 })
+    expect(onAnswer).toHaveBeenCalledWith('right', { kind: 'choice', index: 1 }, 'sure')
   })
 
   it('Antippen wählt nur aus; erst „Prüfen“ wertet, eine neue Wahl ersetzt die alte', async () => {
     const onAnswer = vi.fn()
     render(<Choice card={choiceCard('c1')} rng={seededRng(7)} onAnswer={onAnswer} />)
-    expect(screen.getByRole('button', { name: 'Prüfen' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Sicher' })).toBeDisabled()
     await userEvent.click(screen.getByRole('button', { name: /Falsch A/ }))
     expect(onAnswer).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: /Falsch A/ })).toHaveAttribute('aria-pressed', 'true')
@@ -41,7 +41,7 @@ describe('Choice', () => {
     expect(screen.getByRole('button', { name: /Falsch A/ })).toHaveAttribute('aria-pressed', 'false')
     await check()
     expect(onAnswer).toHaveBeenCalledTimes(1)
-    expect(onAnswer).toHaveBeenCalledWith('right', { kind: 'choice', index: 1 })
+    expect(onAnswer).toHaveBeenCalledWith('right', { kind: 'choice', index: 1 }, 'sure')
   })
 
   it('Optionen tragen Buchstaben A–D', () => {
@@ -56,15 +56,15 @@ describe('Cloze', () => {
     const onAnswer = vi.fn()
     render(<Cloze card={clozeCard('z1')} onAnswer={onAnswer} />)
     await userEvent.type(screen.getByLabelText('Lücke 1'), 'Mitochondrein')
-    await userEvent.click(screen.getByRole('button', { name: 'Prüfen' }))
-    expect(onAnswer).toHaveBeenCalledWith('right', { kind: 'cloze', inputs: ['Mitochondrein'], perGap: [true] })
+    await userEvent.click(screen.getByRole('button', { name: 'Sicher' }))
+    expect(onAnswer).toHaveBeenCalledWith('right', { kind: 'cloze', inputs: ['Mitochondrein'], perGap: [true] }, 'sure')
   })
 
   it('falsche Eingabe → wrong', async () => {
     const onAnswer = vi.fn()
     render(<Cloze card={clozeCard('z1')} onAnswer={onAnswer} />)
     await userEvent.type(screen.getByLabelText('Lücke 1'), 'Ribosom')
-    await userEvent.click(screen.getByRole('button', { name: 'Prüfen' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sicher' }))
     expect(onAnswer.mock.calls[0]?.[0]).toBe('wrong')
   })
 })
@@ -93,17 +93,17 @@ describe('Matching', () => {
     await tap('Gasaustausch')
     await tap('Niere')
     await tap('Filter')
-    await userEvent.click(screen.getByRole('button', { name: 'Prüfen' }))
-    expect(onAnswer).toHaveBeenCalledWith('right', { kind: 'matching', mapping: [0, 1, 2] })
+    await userEvent.click(screen.getByRole('button', { name: 'Sicher' }))
+    expect(onAnswer).toHaveBeenCalledWith('right', { kind: 'matching', mapping: [0, 1, 2] }, 'sure')
   })
 
   it('Prüfen erst nach vollständiger Zuordnung', async () => {
     render(<Matching card={matchingCard('m1')} rng={seededRng(3)} onAnswer={vi.fn()} />)
-    expect(screen.getByRole('button', { name: 'Prüfen' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Sicher' })).toBeDisabled()
     await tap('Herz')
     expect(screen.getByRole('button', { name: 'Herz' })).toHaveAttribute('aria-pressed', 'true')
     await tap('Pumpe')
-    expect(screen.getByRole('button', { name: 'Prüfen' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Sicher' })).toBeDisabled()
   })
 
   it('eine schon vergebene rechte Kachel wechselt zum neuen Partner', async () => {
@@ -117,8 +117,8 @@ describe('Matching', () => {
     await tap('Pumpe')
     await tap('Niere')
     await tap('Gasaustausch')
-    await userEvent.click(screen.getByRole('button', { name: 'Prüfen' }))
-    expect(onAnswer).toHaveBeenCalledWith('wrong', { kind: 'matching', mapping: [0, 2, 1] })
+    await userEvent.click(screen.getByRole('button', { name: 'Sicher' }))
+    expect(onAnswer).toHaveBeenCalledWith('wrong', { kind: 'matching', mapping: [0, 2, 1] }, 'sure')
   })
 })
 
@@ -135,8 +135,8 @@ describe('Order', () => {
         await userEvent.click(screen.getByRole('button', { name: `${names[target]} nach oben` }))
       }
     }
-    await userEvent.click(screen.getByRole('button', { name: 'Prüfen' }))
-    expect(onAnswer).toHaveBeenCalledWith('right', { kind: 'order', order: [0, 1, 2] })
+    await userEvent.click(screen.getByRole('button', { name: 'Sicher' }))
+    expect(onAnswer).toHaveBeenCalledWith('right', { kind: 'order', order: [0, 1, 2] }, 'sure')
   })
 })
 
@@ -173,6 +173,6 @@ describe('Free', () => {
     expect(screen.getByText('Konzentrationsgefälle')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Nicht gewusst' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Teilweise' }))
-    expect(onAnswer).toHaveBeenCalledWith('partial', { kind: 'free', text: 'Wasser geht durch Membran' })
+    expect(onAnswer).toHaveBeenCalledWith('partial', { kind: 'free', text: 'Wasser geht durch Membran' }, null)
   })
 })

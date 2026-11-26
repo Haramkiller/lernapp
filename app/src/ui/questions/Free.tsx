@@ -15,7 +15,7 @@ export function Free({ card, onAnswer }: QuestionProps<'free'>) {
   const [text, setText] = useState('')
   const [revealed, setRevealed] = useState(false)
   const area = useRef<HTMLTextAreaElement>(null)
-  const rate = (o: Outcome) => onAnswer(o, { kind: 'free', text })
+  const rate = (o: Outcome) => onAnswer(o, { kind: 'free', text }, null)
 
   // Das Feld wächst mit dem Text, statt innen zu scrollen.
   useLayoutEffect(() => {

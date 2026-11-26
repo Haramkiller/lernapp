@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { checkChoice } from '../../answers/check'
 import { shuffledIndices } from '../random'
 import type { ShuffledQuestionProps } from '../types'
-import { AnswerBar } from './AnswerBar'
+import { ConfidenceBar } from './ConfidenceBar'
 
 const LETTERS = 'ABCDEFGH'
 
@@ -29,9 +29,9 @@ export function Choice({ card, rng, onAnswer }: ShuffledQuestionProps<'choice'>)
           </button>
         ))}
       </div>
-      <AnswerBar
+      <ConfidenceBar
         disabled={selected === null}
-        onClick={() => selected !== null && onAnswer(checkChoice(selected, card.payload), { kind: 'choice', index: selected })}
+        onPick={(c) => selected !== null && onAnswer(checkChoice(selected, card.payload), { kind: 'choice', index: selected }, c)}
       />
     </section>
   )

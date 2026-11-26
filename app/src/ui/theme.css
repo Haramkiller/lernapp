@@ -1842,3 +1842,10 @@ button.cta:disabled {
 .chest-finds .glow.rarity-legendary::before {
   inset: -22%;
 }
+
+/* Eintippen: „Weiß nicht“ klein über der Leiste mit Sicher/Unsicher */
+button.link.dont-know {
+  display: block;
+  margin: 4px auto 0;
+  padding: 8px 12px;
+}

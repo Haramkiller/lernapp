@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, type PointerEvent } from 'react'
 import { checkOrder } from '../../answers/check'
 import { shuffledIndices } from '../random'
 import type { ShuffledQuestionProps } from '../types'
-import { AnswerBar } from './AnswerBar'
+import { ConfidenceBar } from './ConfidenceBar'
 
 /** Verschiebt das Element an Position `from` nach `to` (die übrigen rücken nach). */
 export function moveItem<T>(list: T[], from: number, to: number): T[] {
@@ -85,7 +85,7 @@ export function Order({ card, rng, onAnswer }: ShuffledQuestionProps<'order'>) {
           </li>
         ))}
       </ol>
-      <AnswerBar onClick={() => onAnswer(checkOrder(order, card.payload), { kind: 'order', order })} />
+      <ConfidenceBar onPick={(c) => onAnswer(checkOrder(order, card.payload), { kind: 'order', order }, c)} />
     </section>
   )
 }

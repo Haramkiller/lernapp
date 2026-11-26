@@ -1,7 +1,8 @@
 import { Fragment, useState, type FormEvent } from 'react'
+import type { Confidence } from '../../srs/grading'
 import { checkCloze } from '../../answers/check'
 import type { QuestionProps } from '../types'
-import { AnswerBar } from './AnswerBar'
+import { ConfidenceBar } from './ConfidenceBar'
 
 /** Lücke im Satz: wächst mit der Eingabe, gestrichelt solange leer. */
 function Gap({ n, value, onChange }: { n: number; value: string; onChange: (v: string) => void }) {
@@ -32,14 +33,15 @@ export function Cloze({ card, onAnswer }: QuestionProps<'cloze'>) {
     .sort((a, b) => a - b)
   const placeholdersOk = found.length === gaps.length && found.every((n, i) => n === i + 1)
 
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
+  // Enter schickt nicht ab: man soll sich bewusst für „Sicher“ oder „Unsicher“ entscheiden.
+  const noSubmit = (e: FormEvent) => e.preventDefault()
+  const check = (c: Confidence) => {
     const { perGap, outcome } = checkCloze(inputs, card.payload)
-    onAnswer(outcome, { kind: 'cloze', inputs, perGap })
+    onAnswer(outcome, { kind: 'cloze', inputs, perGap }, c)
   }
 
   return (
-    <form className="ask" onSubmit={submit}>
+    <form className="ask" onSubmit={noSubmit}>
       <span className="ask-kind">Lückentext</span>
       <p className="question cloze">
         {!placeholdersOk && text.replace(/\{\{\d+\}\}/g, '…')}
@@ -58,7 +60,7 @@ export function Cloze({ card, onAnswer }: QuestionProps<'cloze'>) {
           ))}
         </div>
       )}
-      <AnswerBar submit />
+      <ConfidenceBar onPick={check} />
     </form>
   )
 }

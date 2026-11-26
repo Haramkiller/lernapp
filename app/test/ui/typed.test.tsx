@@ -15,13 +15,14 @@ const card = () => {
 const input = () => screen.getByRole('textbox', { name: 'Deine Antwort' })
 
 describe('Typed', () => {
-  it('richtige Eingabe + Enter → sofort richtig', async () => {
+  it('richtige Eingabe + „Sicher“ → sofort richtig', async () => {
     const onAnswer = vi.fn()
     render(<Typed card={card()} onAnswer={onAnswer} />)
     expect(screen.getByText('Eintippen')).toBeInTheDocument()
-    await userEvent.type(input(), 'mitochondrium{Enter}')
+    await userEvent.type(input(), 'mitochondrium')
+    await userEvent.click(screen.getByRole('button', { name: 'Sicher' }))
     expect(onAnswer).toHaveBeenCalledTimes(1)
-    expect(onAnswer).toHaveBeenCalledWith('right', { kind: 'typed', text: 'mitochondrium', matched: true, overridden: false })
+    expect(onAnswer).toHaveBeenCalledWith('right', { kind: 'typed', text: 'mitochondrium', matched: true, overridden: false }, 'sure')
   })
 
   it('Feld ohne Autokorrektur', () => {
@@ -29,40 +30,41 @@ describe('Typed', () => {
     expect(input()).toHaveAttribute('autocorrect', 'off')
   })
 
-  it('„Prüfen“ ist bei leerem Feld deaktiviert', async () => {
+  it('„Sicher“ ist bei leerem Feld deaktiviert', async () => {
     render(<Typed card={card()} onAnswer={vi.fn()} />)
-    expect(screen.getByRole('button', { name: 'Prüfen' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Sicher' })).toBeDisabled()
     await userEvent.type(input(), '   ')
-    expect(screen.getByRole('button', { name: 'Prüfen' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Sicher' })).toBeDisabled()
   })
 
   it('falsche Eingabe zeigt die Lösung und speichert erst nach „Doch richtig“', async () => {
     const onAnswer = vi.fn()
     render(<Typed card={card()} onAnswer={onAnswer} />)
     await userEvent.type(input(), 'Ribosomen')
-    await userEvent.click(screen.getByRole('button', { name: 'Prüfen' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sicher' }))
     expect(onAnswer).not.toHaveBeenCalled()
     expect(screen.getByText('Lösung: Mitochondrien')).toBeInTheDocument()
     expect(screen.getByText('B stimmt, weil B.')).toBeInTheDocument()
     expect(input()).toBeDisabled()
     await userEvent.click(screen.getByRole('button', { name: 'Doch richtig' }))
-    expect(onAnswer).toHaveBeenCalledWith('right', { kind: 'typed', text: 'Ribosomen', matched: false, overridden: true })
+    expect(onAnswer).toHaveBeenCalledWith('right', { kind: 'typed', text: 'Ribosomen', matched: false, overridden: true }, 'sure')
   })
 
   it('falsche Eingabe + „Weiter“ → falsch', async () => {
     const onAnswer = vi.fn()
     render(<Typed card={card()} onAnswer={onAnswer} />)
-    await userEvent.type(input(), 'Ribosomen{Enter}')
+    await userEvent.type(input(), 'Ribosomen')
+    await userEvent.click(screen.getByRole('button', { name: 'Sicher' }))
     await userEvent.click(screen.getByRole('button', { name: 'Weiter' }))
     expect(onAnswer).toHaveBeenCalledTimes(1)
-    expect(onAnswer).toHaveBeenCalledWith('wrong', { kind: 'typed', text: 'Ribosomen', matched: false, overridden: false })
+    expect(onAnswer).toHaveBeenCalledWith('wrong', { kind: 'typed', text: 'Ribosomen', matched: false, overridden: false }, 'sure')
   })
 
   it('„Weiß nicht“ → sofort falsch mit leerem Text', async () => {
     const onAnswer = vi.fn()
     render(<Typed card={card()} onAnswer={onAnswer} />)
     await userEvent.click(screen.getByRole('button', { name: 'Weiß nicht' }))
-    expect(onAnswer).toHaveBeenCalledWith('wrong', { kind: 'typed', text: '', matched: false, overridden: false })
+    expect(onAnswer).toHaveBeenCalledWith('wrong', { kind: 'typed', text: '', matched: false, overridden: false }, 'unsure')
   })
 })
 

@@ -45,7 +45,8 @@ beforeEach(async () => {
 describe('Eintippen im Kampf', () => {
   it('sichere Karte wird eingetippt und gespeichert', async () => {
     const before = await setup(30)
-    await userEvent.type(await field(), 'Mitochondrien{Enter}')
+    await userEvent.type(await field(), 'Mitochondrien')
+    await userEvent.click(screen.getByRole('button', { name: 'Sicher' }))
     expect(await screen.findByText('Richtig!')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Richtig B/ })).not.toBeInTheDocument()
     await vi.waitFor(async () => expect((await db.states.get('t'))!.state.reps).toBe(before.reps + 1))
@@ -60,7 +61,8 @@ describe('Eintippen im Kampf', () => {
   it('falsche Eingabe speichert nichts, auch nicht beim Beenden', async () => {
     const before = await setup(30)
     const outbox = await db.outbox.count()
-    await userEvent.type(await field(), 'Ribosomen{Enter}')
+    await userEvent.type(await field(), 'Ribosomen')
+    await userEvent.click(screen.getByRole('button', { name: 'Sicher' }))
     expect(await screen.findByText('Lösung: Mitochondrien')).toBeInTheDocument()
     expect(await db.outbox.count()).toBe(outbox)
     expect((await db.states.get('t'))!.state).toEqual(before)
@@ -71,7 +73,8 @@ describe('Eintippen im Kampf', () => {
 
   it('„Doch richtig“ speichert als richtig', async () => {
     const before = await setup(30)
-    await userEvent.type(await field(), 'Ribosomen{Enter}')
+    await userEvent.type(await field(), 'Ribosomen')
+    await userEvent.click(screen.getByRole('button', { name: 'Sicher' }))
     await userEvent.click(await screen.findByRole('button', { name: 'Doch richtig' }))
     expect(await screen.findByText('Richtig!')).toBeInTheDocument()
     await vi.waitFor(async () => expect((await db.states.get('t'))!.state.reps).toBe(before.reps + 1))
