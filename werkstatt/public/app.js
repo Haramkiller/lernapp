@@ -236,3 +236,47 @@ $('commit').addEventListener('click', async () => {
 })
 
 init()
+
+// --- Kernantworten ergänzen ----------------------------------------------------------------------
+
+let typedJob = null
+
+$('typed-run').addEventListener('click', async () => {
+  $('typed-run').disabled = true
+  $('typed-status').textContent = 'Starte …'
+  try {
+    const { jobId } = await postJson('/api/typed', {})
+    typedJob = jobId
+    show('typed-cancel', true)
+    for (;;) {
+      const job = await api(`/api/jobs/${jobId}`)
+      if (job.status === 'running') {
+        $('typed-status').textContent = `${job.progress.done} / ${job.progress.total} Karten geprüft`
+        await new Promise((r) => setTimeout(r, 1500))
+        continue
+      }
+      const done = job.status === 'done' ? `Fertig: ${job.updated ?? 0} Karten ergänzt.` : 'Abgebrochen mit Fehler.'
+      $('typed-status').textContent = job.error ? `${done} ${job.error}` : done
+      break
+    }
+  } catch (e) {
+    $('typed-status').textContent = e.message
+  } finally {
+    typedJob = null
+    show('typed-cancel', false)
+    $('typed-run').disabled = false
+  }
+})
+
+$('typed-cancel').addEventListener('click', async () => {
+  if (!typedJob) return
+  $('typed-cancel').disabled = true
+  try {
+    await postJson(`/api/jobs/${typedJob}/cancel`, {})
+    $('typed-status').textContent = 'Wird nach dem laufenden Stapel abgebrochen …'
+  } catch (e) {
+    $('typed-status').textContent = e.message
+  } finally {
+    $('typed-cancel').disabled = false
+  }
+})

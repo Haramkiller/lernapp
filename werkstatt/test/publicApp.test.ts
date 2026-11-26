@@ -54,4 +54,18 @@ describe('Werkstatt-Oberfläche', () => {
     expect(commit.examTopics).toEqual(['Thema A'])
     vi.unstubAllGlobals()
   })
+
+  it('Kernantworten ergänzen: startet den Lauf und meldet das Ergebnis', async () => {
+    const { posted } = await loadWerkstatt({
+      '/api/config': { configured: true, loggedIn: true },
+      '/api/modules': { modules: [{ id: 'm1', name: 'Eins', topics: [] }, { id: 'm2', name: 'Zwei', topics: [] }] },
+      '/api/typed': { jobId: 't1' },
+      '/api/jobs/t1': { status: 'done', progress: { done: 3, total: 3 }, updated: 2 },
+    })
+    ;(document.getElementById('typed-run') as HTMLButtonElement).click()
+    await vi.waitFor(() => expect(document.getElementById('typed-status')!.textContent).toContain('Fertig: 2 Karten ergänzt.'))
+    expect(posted.some((p) => p.path === '/api/typed')).toBe(true)
+    expect(document.getElementById('typed-cancel')!.hidden).toBe(true)
+    vi.unstubAllGlobals()
+  })
 })
