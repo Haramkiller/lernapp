@@ -1,41 +1,10 @@
-import type { Card } from '@lernapp/shared'
+import { CARD_EXAMPLE, PAYLOAD_RULES, type Card } from '@lernapp/shared'
 
 export interface PromptChunk {
   path: string
   firstPage: number
   lastPage: number
 }
-
-const EXAMPLE = `{
-  "cards": [
-    {
-      "topic": "Name des Themas",
-      "type": "choice",
-      "payload": {
-        "question": "…?",
-        "options": [
-          { "text": "…", "correct": true,  "why": "Warum richtig" },
-          { "text": "…", "correct": false, "why": "Warum falsch" },
-          { "text": "…", "correct": false, "why": "Warum falsch" },
-          { "text": "…", "correct": false, "why": "Warum falsch" }
-        ]
-      },
-      "explanation": "Kurze Erklärung (1–2 Sätze).",
-      "source": { "file": "dateiname.pdf", "page": 17, "quote": "Kurzes wörtliches Zitat" },
-      "examRelevant": false,
-      "fromExam": false,
-      "difficulty": 2
-    }
-  ]
-}`
-
-const PAYLOAD_RULES = `Frage-Typen und ihr "payload" (genau so, keine weiteren Felder nötig):
-- "choice": { "question", "options": [genau 4 × { "text", "correct", "why" }] } – genau EINE Option mit correct=true; "why" bei JEDER Option (auch bei der richtigen) begründet kurz, warum sie stimmt bzw. falsch ist.
-- "cloze": { "text": "Satz mit Platzhaltern {{1}}, {{2}} …", "gaps": [{ "answers": ["Lösung", "Alternativschreibweise"] }, …] } – Platzhalter {{1}}..{{n}} kommen im Text genau einmal je Lücke vor, gaps[0] gehört zu {{1}} usw.
-- "matching": { "prompt", "pairs": [3 bis 6 × { "left", "right" }] }
-- "order": { "prompt", "steps": [3 bis 8 Schritte in der KORREKTEN Reihenfolge] }
-- "free": { "question", "modelAnswer", "keyPoints": [mindestens 1 Stichpunkt] }
-Weitere Felder je Karte: "topic" (Thema), "explanation" (kurz!), "source" ({file, page, quote} oder null), "examRelevant" (bool), "fromExam" (bool), "difficulty" (1, 2 oder 3).`
 
 function common(chunk: PromptChunk, ctx: { moduleName: string; existingTopics: string[]; fileName: string }): string {
   const offset = chunk.firstPage - 1
@@ -66,7 +35,7 @@ function outputRules(extra: string): string {
   return `
 Antwortformat: Antworte AUSSCHLIESSLICH mit einem einzigen JSON-Objekt, ohne Text davor oder danach und ohne Codeblock. Es muss dieser Struktur entsprechen${extra}:
 
-${EXAMPLE}`
+${CARD_EXAMPLE}`
 }
 
 export function scriptPrompt(
