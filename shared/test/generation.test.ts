@@ -43,4 +43,13 @@ describe('parseGeneration (shared)', () => {
     expect(PAYLOAD_RULES).toContain('{{1}}')
     expect(CARD_EXAMPLE).toContain('"cards"')
   })
+
+  it('Kernantwort: Regeln und Beispiel nennen "typed", parseGeneration behält das Feld', () => {
+    expect(PAYLOAD_RULES).toContain('"typed"')
+    expect(CARD_EXAMPLE).toContain('"typed"')
+    const card = { ...choice('Energieträger?'), payload: { ...choice('Energieträger?').payload, typed: { answers: ['ATP'] } } }
+    const { result } = parseGeneration(JSON.stringify({ cards: [card] }))
+    const c = result.cards[0]!
+    expect(c.type === 'choice' && c.payload.typed).toEqual({ answers: ['ATP'] })
+  })
 })

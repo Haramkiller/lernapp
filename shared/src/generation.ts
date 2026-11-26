@@ -120,7 +120,8 @@ export const CARD_EXAMPLE = `{
           { "text": "…", "correct": false, "why": "Warum falsch" },
           { "text": "…", "correct": false, "why": "Warum falsch" },
           { "text": "…", "correct": false, "why": "Warum falsch" }
-        ]
+        ],
+        "typed": { "answers": ["…", "…"] }
       },
       "explanation": "Kurze Erklärung (1–2 Sätze).",
       "source": { "file": "dateiname.pdf", "page": 17, "quote": "Kurzes wörtliches Zitat" },
@@ -134,6 +135,7 @@ export const CARD_EXAMPLE = `{
 /** Regeln für Fragetypen und ihr payload (für Aufträge an Claude). */
 export const PAYLOAD_RULES = `Frage-Typen und ihr "payload" (genau so, keine weiteren Felder nötig):
 - "choice": { "question", "options": [genau 4 × { "text", "correct", "why" }] } – genau EINE Option mit correct=true; "why" bei JEDER Option (auch bei der richtigen) begründet kurz, warum sie stimmt bzw. falsch ist.
+  Dazu "typed": { "answers": ["Hauptlösung", "Variante", …] } – die kurze Kernantwort zum Eintippen (ein Begriff oder eine knappe Wortgruppe, höchstens etwa 4 Wörter); "answers"[0] ist die Hauptlösung, danach gängige Varianten (Singular/Plural, Fachwort/deutsches Wort, Abkürzung, andere Schreibweise). Hat die Frage keine sinnvolle Kurzantwort (z. B. „Warum …?“ oder eine ganze Satz-Antwort), setze "typed": null.
 - "cloze": { "text": "Satz mit Platzhaltern {{1}}, {{2}} …", "gaps": [{ "answers": ["Lösung", "Alternativschreibweise"] }, …] } – Platzhalter {{1}}..{{n}} kommen im Text genau einmal je Lücke vor, gaps[0] gehört zu {{1}} usw.
 - "matching": { "prompt", "pairs": [3 bis 6 × { "left", "right" }] }
 - "order": { "prompt", "steps": [3 bis 8 Schritte in der KORREKTEN Reihenfolge] }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { CardDraftSchema, GenerationResultSchema } from '../src/card'
+import { CardDraftSchema, GenerationResultSchema, typedAnswers } from '../src/card'
 
 const base = {
   topic: 'Zellbiologie',
@@ -136,5 +136,31 @@ describe('GenerationResultSchema', () => {
 
   it('lehnt Ergebnis mit ungültiger Karte ab', () => {
     expect(GenerationResultSchema.safeParse({ cards: [{ ...validChoice, difficulty: 9 }] }).success).toBe(false)
+  })
+})
+
+describe('Kernantwort typed', () => {
+  const withTyped = (typed: unknown) => ({ ...validChoice, payload: { ...validChoice.payload, typed } })
+
+  it('choice: typed optional, null erlaubt, ungültig macht die Karte nicht ungültig', () => {
+    expect(CardDraftSchema.safeParse(withTyped({ answers: ['Mitochondrien'] })).success).toBe(true)
+    expect(CardDraftSchema.safeParse(withTyped(null)).success).toBe(true)
+    const ok = CardDraftSchema.safeParse(withTyped({ answers: ['Mitochondrien'] }))
+    expect(ok.success && ok.data.type === 'choice' && ok.data.payload.typed).toEqual({ answers: ['Mitochondrien'] })
+    for (const bad of [{ answers: [] }, { answers: [3] }, 'x', 5]) {
+      const r = CardDraftSchema.safeParse(withTyped(bad))
+      expect(r.success).toBe(true)
+      expect(r.success && r.data.type === 'choice' && r.data.payload.typed).toBeUndefined()
+    }
+  })
+
+  it('typedAnswers: getrimmt, ohne leere, sonst null', () => {
+    const p = (typed: unknown) => ({ question: 'q', options: [], typed }) as never
+    expect(typedAnswers(p({ answers: [' Mitochondrien ', '', 'Mitochondrium'] }))).toEqual(['Mitochondrien', 'Mitochondrium'])
+    expect(typedAnswers(p(null))).toBeNull()
+    expect(typedAnswers(p(undefined))).toBeNull()
+    expect(typedAnswers(p({ answers: ['  '] }))).toBeNull()
+    expect(typedAnswers(p({ answers: [3] }))).toBeNull()
+    expect(typedAnswers(p('Mitochondrien'))).toBeNull()
   })
 })

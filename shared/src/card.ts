@@ -12,14 +12,34 @@ export type Source = z.infer<typeof SourceSchema>
 
 const text = z.string().min(1)
 
+/** Kurze Kernantwort zum Eintippen: answers[0] ist die angezeigte Lösung, weitere sind erlaubte Varianten. */
+export const TypedSchema = z.object({ answers: z.array(z.string().min(1)).min(1) })
+export type Typed = z.infer<typeof TypedSchema>
+
 export const ChoicePayloadSchema = z.object({
   question: text,
   options: z
     .array(z.object({ text, correct: z.boolean(), why: text }))
     .length(4)
     .refine((o) => o.filter((x) => x.correct).length === 1, { message: 'Genau eine Option muss richtig sein' }),
+  /**
+   * Kernantwort: Objekt = kann zur Eingabe werden; null = geprüft, keine sinnvolle Kurzantwort; fehlt = noch nicht
+   * geprüft. Ein ungültiger Wert gilt als „fehlt“, damit die Karte spielbar bleibt.
+   */
+  typed: TypedSchema.nullable().optional().catch(undefined),
 })
 export type ChoicePayload = z.infer<typeof ChoicePayloadSchema>
+
+/** Gültige Kernantworten (getrimmt, ohne leere) oder null. Prüft selbst, auch bei ungeparsten Karten. */
+export function typedAnswers(p: ChoicePayload): string[] | null {
+  const typed: unknown = (p as { typed?: unknown }).typed
+  if (!typed || typeof typed !== 'object' || !Array.isArray((typed as { answers?: unknown }).answers)) return null
+  const answers = ((typed as { answers: unknown[] }).answers)
+    .filter((a): a is string => typeof a === 'string')
+    .map((a) => a.trim())
+    .filter((a) => a.length > 0)
+  return answers.length > 0 ? answers : null
+}
 
 export const ClozePayloadSchema = z
   .object({
