@@ -91,6 +91,7 @@ export function MapDialog({ overview, onBattle, onClose }: Props) {
                     <span className="bar threat-bar" aria-hidden="true">
                       <span style={{ width: `${m.life ?? 0}%` }} />
                     </span>
+                    {m.calibration !== null && <p className="calibration small">{`Wenn du sicher bist: ${m.calibration} % richtig`}</p>}
                   </div>
                 </div>
                 {m.topics.length > 0 && (

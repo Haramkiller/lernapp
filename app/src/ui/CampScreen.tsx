@@ -3,6 +3,7 @@ import { db } from '../data/db'
 import { loadAreaChoices, loadLastBattleAt } from '../data/game'
 import { loadSettings } from '../data/settings'
 import { buildOverview, type Overview } from '../game/overview'
+import { calibrationByModule } from '../game/calibration'
 import { isRested, minutesUntilRested } from '../game/rest'
 import { CAMP, fireFrames } from '../game/scenes'
 import { newDoneKey } from '../session/queue'
@@ -51,7 +52,7 @@ export function syncText(s: SyncStatus): string {
 
 /** Lädt alles für Waldplatz, Karte und Titelbild aus der lokalen Datenbank. */
 export async function loadOverview(t: Date): Promise<Data> {
-  const [cards, rows, topics, modules, settings, dead, chosen, lastBattleAt] = await Promise.all([
+  const [cards, rows, topics, modules, settings, dead, chosen, lastBattleAt, logs] = await Promise.all([
     db.cards.toArray(),
     db.states.toArray(),
     db.topics.toArray(),
@@ -60,10 +61,12 @@ export async function loadOverview(t: Date): Promise<Data> {
     db.dead.count(),
     loadAreaChoices(),
     loadLastBattleAt(),
+    db.logs.toArray(),
   ])
   const states = new Map(rows.map((r) => [r.cardId, r.state]))
   const newDoneToday = ((await db.meta.get(newDoneKey(t)))?.value as number | undefined) ?? 0
-  return { overview: buildOverview({ cards, states, topics, modules, newDoneToday, now: t, settings, chosen }), dead, lastBattleAt }
+  const calibration = calibrationByModule(logs, new Map(cards.filter((c) => !c.deleted).map((c) => [c.id, c.moduleId])), t)
+  return { overview: buildOverview({ cards, states, topics, modules, newDoneToday, now: t, settings, chosen, calibration }), dead, lastBattleAt }
 }
 
 export function CampScreen({ now = () => new Date(), sync, refreshKey = 0, onBattle, onSettings, onSyncNow, onCreateCards, onCollection, onGreenhouse }: Props) {

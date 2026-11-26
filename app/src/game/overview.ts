@@ -13,6 +13,8 @@ export type ModuleView = {
   due: number
   fresh: number
   topics: TopicStatus[]
+  /** „Wenn du sicher bist: N % richtig“ (letzte 30 Tage); null = zu wenige sichere Antworten. */
+  calibration: number | null
 }
 /** `modules` leer = Region liegt im Nebel. */
 export type RegionView = { region: RegionDef; modules: ModuleView[] }
@@ -29,8 +31,10 @@ export function buildOverview(input: {
   now: Date
   settings: Settings
   chosen: AreaChoices
+  /** Treffsicherheit je Modul (siehe calibrationByModule). */
+  calibration?: Map<string, number>
 }): Overview {
-  const { cards, states, topics, modules, newDoneToday, now, settings, chosen } = input
+  const { cards, states, topics, modules, newDoneToday, now, settings, chosen, calibration } = input
   const retention = settings.retention
   const bosses = assignBosses(modules, chosen)
   const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, 'de')
@@ -48,6 +52,7 @@ export function buildOverview(input: {
       life: lifePercent(bossLife(mine, states, now, retention)),
       due: queue.length - fresh,
       fresh,
+      calibration: calibration?.get(module.id) ?? null,
       topics: topics
         .filter((t) => t.moduleId === module.id)
         .sort(byName)
