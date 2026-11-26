@@ -78,7 +78,7 @@ Danach startet die App wie eine normale App und funktioniert auch ohne Internet.
 
 ## 5. Für Freunde
 
-**Variante A: gemeinsame Datenbank (einfach).** Du gibst den App-Link weiter. Dein Freund öffnet ihn, registriert sich mit seiner eigenen E-Mail-Adresse und hat seinen eigenen, von deinem getrennten Lernstand. Die App führt Neue selbst durch die Anmeldung: Auf der Startseite ‚Ich bin neu‘ wählen. Nachteil: alle teilen sich dein Gratis-Kontingent bei Supabase. Die Registrierung ist offen: Jeder, der den Link kennt, kann sich auf deiner Datenbank registrieren (er sieht nur seine eigenen Daten). Wenn du das nicht möchtest, schalte in Supabase unter **Authentication** → **Sign In / Providers** die Neuanmeldungen aus (**Allow new users to sign up**).
+**Variante A: gemeinsame Datenbank (einfach).** Du gibst den App-Link weiter. Dein Freund öffnet ihn, registriert sich mit seiner eigenen E-Mail-Adresse und hat seinen eigenen, von deinem getrennten Lernstand. Die App führt Neue selbst durch die Anmeldung: Auf der Startseite **Ich bin neu** wählen. Nachteil: alle teilen sich dein Gratis-Kontingent bei Supabase. Die Registrierung ist offen: Jeder, der den Link kennt, kann sich auf deiner Datenbank registrieren (er sieht nur seine eigenen Daten). Wenn du das nicht möchtest, schalte in Supabase unter **Authentication** → **Sign In / Providers** die Neuanmeldungen aus (**Allow new users to sign up**).
 
 **Karten ohne Claude-Abo.** Ohne Claude-Abo erstellen Freunde Karten über **Karten erstellen** im Menü: Die App führt Schritt für Schritt durch den kostenlosen Chat auf claude.ai.
 

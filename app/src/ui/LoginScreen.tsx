@@ -18,6 +18,13 @@ type Props = {
 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err))
 
+/** Häufige englische Meldungen von Supabase auf Deutsch; Unbekanntes bleibt wie es ist. */
+function explain(text: string): string {
+  if (/invalid login credentials/i.test(text)) return 'E-Mail oder Passwort stimmen nicht.'
+  if (/already registered/i.test(text)) return 'Diese E-Mail hat schon ein Konto. Geh zurück und wähle „Ich habe schon ein Konto“.'
+  return text
+}
+
 /** Formular für Anmelden oder Konto anlegen; welcher Fall gilt, bestimmt der Aufrufer (WelcomeFlow). */
 export function LoginScreen({ mode, title, submitLabel, initialEmail = '', onSubmit, onBack, children }: Props) {
   const [email, setEmail] = useState(initialEmail)
@@ -36,7 +43,7 @@ export function LoginScreen({ mode, title, submitLabel, initialEmail = '', onSub
       setError(
         /not confirmed/i.test(text)
           ? 'Deine E-Mail ist noch nicht bestätigt. Tippe zuerst auf den Link in der Mail.'
-          : `${mode === 'signIn' ? 'Anmeldung' : 'Registrierung'} fehlgeschlagen: ${text}`,
+          : `${mode === 'signIn' ? 'Anmeldung' : 'Registrierung'} fehlgeschlagen: ${explain(text)}`,
       )
     } finally {
       setBusy(false)

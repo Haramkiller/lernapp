@@ -118,24 +118,30 @@ export function App({ env = defaultEnv, makeClient = createAppClient, confirm = 
     }
   }, [client]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const running = useRef(false)
-  const runSync = useCallback(async () => {
-    if (!client || running.current) return
+  // Läuft schon eine Synchronisierung, bekommt ein zweiter Aufruf dieselbe zurück (z. B. „Karten erstellen“ wartet darauf).
+  const inflight = useRef<Promise<void> | null>(null)
+  const runSync = useCallback((): Promise<void> => {
+    if (!client) return Promise.resolve()
+    if (inflight.current) return inflight.current
     if (!navigator.onLine) {
       setStatus({ kind: 'offline' })
-      return
+      return Promise.resolve()
     }
-    running.current = true
     setStatus({ kind: 'syncing' })
-    try {
-      const result = await sync(createSupabaseRemote(client), new Date())
-      setStatus(result.pushError ? { kind: 'error', message: result.pushError } : { kind: 'ok', at: new Date() })
-    } catch (e) {
-      setStatus({ kind: 'error', message: e instanceof Error ? e.message : String(e) })
-    } finally {
-      running.current = false
-      setRefreshKey((k) => k + 1)
-    }
+    // Erst im nächsten Mikrotask starten: So steht `inflight` fest, bevor `finally` es zurücksetzen kann.
+    const run = Promise.resolve().then(async () => {
+      try {
+        const result = await sync(createSupabaseRemote(client), new Date())
+        setStatus(result.pushError ? { kind: 'error', message: result.pushError } : { kind: 'ok', at: new Date() })
+      } catch (e) {
+        setStatus({ kind: 'error', message: e instanceof Error ? e.message : String(e) })
+      } finally {
+        inflight.current = null
+        setRefreshKey((k) => k + 1)
+      }
+    })
+    inflight.current = run
+    return run
   }, [client])
 
   // Sync nach Anmeldung und sobald das Netz zurückkommt; Lernen wird nie darauf blockiert.
@@ -163,6 +169,8 @@ export function App({ env = defaultEnv, makeClient = createAppClient, confirm = 
     }
     const { data, error } = await client.auth.signUp({ email, password })
     if (error) throw error
+    // Schon bestätigte Adresse: Supabase meldet keinen Fehler, schickt aber auch keine Mail (Nutzer ohne Identitäten).
+    if (data.user && data.user.identities?.length === 0) throw new Error('User already registered')
     // Ohne Sitzung muss die E-Mail erst bestätigt werden (WelcomeFlow zeigt Schritt 2).
     if (!data.session) return 'confirm'
   }

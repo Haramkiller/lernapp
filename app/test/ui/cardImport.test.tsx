@@ -248,3 +248,74 @@ describe('CardImportFlow', () => {
     expect(b!.module.id).toBe(a!.module.id)
   })
 })
+
+describe('CardImportFlow: Feinschliff', () => {
+  const saveFirst = async () => {
+    await toPaste()
+    await check(ANSWER)
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }))
+    await screen.findByText('3 Karten gespeichert')
+  }
+
+  it('alle Karten fehlerhaft: Hinweis aufs Format statt aufs Kopieren', async () => {
+    setup()
+    await toPaste()
+    const broken = { ...choice('A?', 1), difficulty: 9 }
+    await check(JSON.stringify({ cards: [broken, broken] }))
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('2 fehlerhafte Karten')
+    expect(alert).toHaveTextContent('Format')
+    expect(alert).not.toHaveTextContent('ganze Antwort')
+  })
+
+  it('Tipp kopieren meldet Erfolg', async () => {
+    setup()
+    await saveFirst()
+    await userEvent.click(screen.getByRole('button', { name: 'Tipp kopieren' }))
+    expect(writeText).toHaveBeenLastCalledWith('Weiter ab Seite 10')
+    expect(await screen.findByText('Tipp kopiert')).toBeInTheDocument()
+  })
+
+  it('Tipp kopieren scheitert: Tipp im Textfeld', async () => {
+    setup()
+    await saveFirst()
+    writeText.mockRejectedValue(new Error('nope'))
+    await userEvent.click(screen.getByRole('button', { name: 'Tipp kopieren' }))
+    expect(await screen.findByLabelText('Tipp zum Kopieren')).toHaveValue('Weiter ab Seite 10')
+  })
+
+  it('nach „Weitere Seiten“ steht der Tipp auch in Schritt 3', async () => {
+    setup()
+    await saveFirst()
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Seiten' }))
+    await screen.findByText('Schritt 3 von 4')
+    expect(screen.getByText(/Weiter ab Seite 10/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Tipp kopieren' })).toBeInTheDocument()
+  })
+
+  it('Module laden scheitert: Hinweis, neues Modul geht trotzdem', async () => {
+    const props = setup()
+    props.loadModules.mockRejectedValue(new Error('kaputt'))
+    // neu rendern, damit der Fehler beim Laden greift
+    document.body.innerHTML = ''
+    render(<CardImportFlow {...props} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Module konnten nicht geladen werden')
+    await userEvent.type(screen.getByLabelText('Name des neuen Moduls'), 'Botanik')
+    expect(screen.getByRole('button', { name: 'Weiter' })).toBeEnabled()
+  })
+
+  it('Themen laden scheitert in Schritt 1: Hinweis statt Stille', async () => {
+    const props = setup({ modules: [botanik] })
+    props.loadContent.mockRejectedValue(new Error('kaputt'))
+    await userEvent.click(await screen.findByRole('button', { name: 'Weiter' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('kaputt')
+    expect(screen.getByText('Schritt 1 von 4')).toBeInTheDocument()
+  })
+
+  it('Schrittwechsel setzt den Fokus auf die neue Überschrift', async () => {
+    setup()
+    await userEvent.type(await screen.findByLabelText('Name des neuen Moduls'), 'Botanik')
+    await userEvent.click(screen.getByRole('button', { name: 'Weiter' }))
+    expect(await screen.findByRole('heading', { name: 'Auftrag kopieren' })).toHaveFocus()
+  })
+})

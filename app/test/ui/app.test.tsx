@@ -175,6 +175,16 @@ describe('App: Registrierung', () => {
     expect(screen.queryByText('Schritt 2 von 3')).not.toBeInTheDocument()
   })
 
+  it('Registrierung mit schon bestätigter E-Mail: Hinweis aufs Anmelden statt Schritt 2', async () => {
+    const { client, auth } = fakeClient({ data: { session: null }, error: null })
+    // Supabase meldet dann keinen Fehler, aber einen Nutzer ohne Identitäten und schickt keine Mail.
+    auth.signUp.mockImplementation(async () => ({ data: { session: null, user: { id: 'u1', identities: [] } }, error: null }))
+    render(<App env={env} makeClient={() => client} />)
+    await signUpAs('a@b.de', 'geheim1')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Diese E-Mail hat schon ein Konto')
+    expect(screen.queryByText('Schritt 2 von 3')).not.toBeInTheDocument()
+  })
+
   it('Registrierung mit Bestätigung zeigt Schritt 2', async () => {
     const { client, auth } = fakeClient({ data: { session: null }, error: null })
     auth.signUp.mockImplementation(async () => ({ data: { session: null, user: { id: 'u1' } }, error: null }))

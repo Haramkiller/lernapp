@@ -128,3 +128,44 @@ describe('SetupScreen', () => {
     expect(onSave).not.toHaveBeenCalled()
   }, 15_000)
 })
+
+describe('WelcomeFlow: Feinschliff', () => {
+  const fillIn = async (email: string, password: string) => {
+    await userEvent.type(screen.getByLabelText('E-Mail'), email)
+    await userEvent.type(screen.getByLabelText('Passwort'), password)
+  }
+
+  it('falsches Passwort: deutscher Hinweis statt englischer Meldung', async () => {
+    render(<WelcomeFlow onSubmit={vi.fn().mockRejectedValue(new Error('Invalid login credentials'))} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Ich habe schon ein Konto' }))
+    await fillIn('a@b.de', 'geheim1')
+    await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Anmeldung fehlgeschlagen: E-Mail oder Passwort stimmen nicht.')
+  })
+
+  it('E-Mail schon registriert: Hinweis aufs Anmelden', async () => {
+    render(<WelcomeFlow onSubmit={vi.fn().mockRejectedValue(new Error('User already registered'))} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Ich bin neu' }))
+    await fillIn('a@b.de', 'geheim1')
+    await userEvent.click(screen.getByRole('button', { name: 'Konto anlegen' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Diese E-Mail hat schon ein Konto')
+  })
+
+  it('Schrittwechsel setzt den Fokus auf die neue Überschrift', async () => {
+    render(<WelcomeFlow onSubmit={vi.fn()} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Ich bin neu' }))
+    expect(screen.getByRole('heading', { name: 'Konto anlegen' })).toHaveFocus()
+    await userEvent.click(screen.getByRole('button', { name: 'Zurück' }))
+    expect(screen.getByRole('heading', { name: 'Willkommen bei Lernabenteuer' })).toHaveFocus()
+  })
+
+  it('Anmelden nach Konto anlegen: Formular startet frisch (eigene Instanz je Schritt)', async () => {
+    const onSubmit = vi.fn(async (mode: string) => (mode === 'signUp' ? ('confirm' as const) : undefined))
+    render(<WelcomeFlow onSubmit={onSubmit} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Ich bin neu' }))
+    await fillIn('a@b.de', 'geheim1')
+    await userEvent.click(screen.getByRole('button', { name: 'Konto anlegen' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Ich habe bestätigt – weiter' }))
+    expect(screen.getByLabelText('Passwort')).toHaveValue('')
+  })
+})

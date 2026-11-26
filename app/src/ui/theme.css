@@ -167,7 +167,8 @@ button.wrong {
   flex-direction: column;
   gap: 14px;
 }
-.card-panel p {
+/* Geführte Abläufe (Anmeldung, Karten erstellen): Abstände nur über gap, keine zusätzlichen Absatzränder. */
+.flow p {
   margin: 0;
 }
 /* Willkommensseite: zwei große Knöpfe untereinander, gut mit dem Daumen erreichbar. */
