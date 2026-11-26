@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { REGIONS } from '../src/game/bosses'
 import { SPECIES_COUNT } from '../src/game/garden'
 import {
-  CAMP, FOG_IMAGES, GARDEN_VIEWS, MAP_IMAGE, MIN_PLANT_SIZE, REGION_SPOTS, TITLE_IMAGE,
+  CAMP, FOG_IMAGES, GARDEN_SLOTS, GARDEN_VIEWS, MAP_IMAGE, MIN_PLANT_SIZE, REGION_SPOTS, TITLE_IMAGE,
   fireFrames, insectFrames, plantImage, regionIcon, slotPositions, treeImage, type ViewId,
 } from '../src/game/scenes'
 
@@ -92,5 +92,41 @@ describe('Gewächshaus', () => {
       ...ids.map((id) => GARDEN_VIEWS[id].image),
     ]
     for (const f of all) expect(existsSync(file(f)), f).toBe(true)
+  })
+})
+
+describe('Plätze für Fundstücke', () => {
+  /** Höhe in % der Kulisse für eine Breite in % (Kulisse 192×256). */
+  const tall = (w: number) => w * 0.75
+  const overlap = (a0: number, a1: number, b0: number, b1: number) => a0 < b1 && b0 < a1
+
+  it('10–14 Plätze, eindeutig, jede Sicht hat welche', () => {
+    expect(GARDEN_SLOTS.length).toBeGreaterThanOrEqual(10)
+    expect(GARDEN_SLOTS.length).toBeLessThanOrEqual(14)
+    expect(new Set(GARDEN_SLOTS.map((s) => s.id)).size).toBe(GARDEN_SLOTS.length)
+    for (const id of Object.keys(GARDEN_VIEWS)) expect(GARDEN_SLOTS.some((s) => s.view === id), id).toBe(true)
+    expect(GARDEN_SLOTS.some((s) => s.size === 'large')).toBe(true)
+  })
+
+  it('kein Platz verdeckt Pflanzen oder das Beet-Schild; Nahansicht bleibt über dem Blättern', () => {
+    for (const s of GARDEN_SLOTS) {
+      const sx0 = s.x - s.w / 2
+      const sx1 = s.x + s.w / 2
+      const sy0 = s.y - tall(s.w)
+      expect(sx0, s.id).toBeGreaterThanOrEqual(0)
+      expect(sx1, s.id).toBeLessThanOrEqual(100)
+      for (const b of GARDEN_VIEWS[s.view].beds) {
+        const near = b.scale === 1
+        // Pflanzen wachsen von der Fußlinie nach oben (Größe 28 % × scale).
+        const plants = overlap(sx0, sx1, b.x, b.x + b.w) && overlap(sy0, s.y, b.y - tall(28 * b.scale), b.y + b.h)
+        const signY = b.y + b.h + (near ? 9 : 4)
+        const half = near ? 35 : b.w / 2
+        const cx = b.x + b.w / 2
+        const sign = overlap(sx0, sx1, cx - half, cx + half) && overlap(sy0, s.y, signY - 3, signY + 3)
+        expect(plants, `${s.id} verdeckt Pflanzen`).toBe(false)
+        expect(sign, `${s.id} verdeckt das Schild`).toBe(false)
+      }
+      if (s.view === 'beetL' || s.view === 'beetR') expect(s.y, s.id).toBeLessThanOrEqual(86)
+    }
   })
 })

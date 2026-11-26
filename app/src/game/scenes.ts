@@ -75,6 +75,27 @@ export const GARDEN_VIEWS: Record<ViewId, GardenView> = {
   beetR: { image: view('beet'), mirror: true, name: 'Beet rechts', moves: { back: 'gang' }, beds: nearBed.map((b) => ({ ...b, side: 'right' })) },
 }
 
+/**
+ * Plätze für Fundstücke je Blickpunkt (Fußpunkt x/y und Breite w in % der Kulisse). Große Plätze nehmen auch
+ * legendäre Stücke. Gespiegelte Blickpunkte haben eigene Plätze.
+ */
+export type GardenSlot = { id: string; view: ViewId; x: number; y: number; w: number; size: 'small' | 'large' }
+
+export const GARDEN_SLOTS: GardenSlot[] = [
+  { id: 'gang-mitte', view: 'gang', x: 50, y: 84, w: 26, size: 'large' },
+  { id: 'gang-links', view: 'gang', x: 16, y: 90, w: 12, size: 'small' },
+  { id: 'gang-rechts', view: 'gang', x: 84, y: 90, w: 12, size: 'small' },
+  { id: 'zurueck-mitte', view: 'zurueck', x: 50, y: 84, w: 26, size: 'large' },
+  { id: 'zurueck-links', view: 'zurueck', x: 16, y: 90, w: 12, size: 'small' },
+  { id: 'zurueck-rechts', view: 'zurueck', x: 84, y: 90, w: 12, size: 'small' },
+  { id: 'tuer-links', view: 'tuer', x: 18, y: 88, w: 14, size: 'small' },
+  { id: 'tuer-rechts', view: 'tuer', x: 82, y: 88, w: 14, size: 'small' },
+  { id: 'beetL-links', view: 'beetL', x: 6, y: 84, w: 11, size: 'small' },
+  { id: 'beetL-rechts', view: 'beetL', x: 94, y: 84, w: 11, size: 'small' },
+  { id: 'beetR-links', view: 'beetR', x: 6, y: 84, w: 11, size: 'small' },
+  { id: 'beetR-rechts', view: 'beetR', x: 94, y: 84, w: 11, size: 'small' },
+]
+
 export function plantImage(species: number, stage: PlantStage): string {
   if (stage === 'seed' || stage === 'sprout') return gameAsset(`garden/plants/${stage}.png`)
   return gameAsset(`garden/plants/p${species}_${stage}.png`)

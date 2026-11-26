@@ -3,7 +3,9 @@ import { db } from '../data/db'
 import { loadAreaChoices, loadMilestones, recordMilestones } from '../data/game'
 import { loadSettings } from '../data/settings'
 import { bloomCount, buildGarden, newMilestones, type BedView, type Milestones, type PlantView } from '../game/garden'
-import { GARDEN_VIEWS, insectFrames, plantImage, slotPositions, treeImage, type BedArea, type Move, type ViewId } from '../game/scenes'
+import { GARDEN_SLOTS, GARDEN_VIEWS, insectFrames, plantImage, slotPositions, treeImage, type BedArea, type GardenSlot, type Move, type ViewId } from '../game/scenes'
+import { checkResearch, loadDesign, loadFinds, markTold, placeItem, raiseSoil, type Design } from '../data/finds'
+import { MAX_SOIL, SOIL_COST, collection, fertilizer, findImage, itemById, itemSize, type FindStatus } from '../game/finds'
 import type { SyncStatus } from './CampScreen'
 import { SceneMenu } from './game/SceneMenu'
 import { Sprite } from './game/Sprite'
@@ -22,7 +24,8 @@ type Props = {
   onCollection?: () => void
 }
 
-type Data = { beds: BedView[]; dead: number }
+/** `announce`: erforschte, noch nicht gemeldete Funde. */
+type Data = { beds: BedView[]; dead: number; finds: FindStatus[]; design: Design; announce: FindStatus[] }
 type Side = 'left' | 'right'
 
 /**
@@ -30,6 +33,12 @@ type Side = 'left' | 'right'
  * und baut daraus den Garten.
  */
 export async function loadGarden(t: Date): Promise<Data> {
+  // Forschung zuerst prüfen; Fehler bei Funden oder Plätzen dürfen den Garten nie verhindern.
+  await checkResearch(t).catch(() => 0)
+  const [finds, design] = await Promise.all([
+    loadFinds().catch((): FindStatus[] => []),
+    loadDesign().catch((): Design => ({ placements: new Map(), soil: new Map() })),
+  ])
   const [cards, rows, topics, modules, settings, chosen, milestones, dead] = await Promise.all([
     db.cards.toArray(),
     db.states.toArray(),
@@ -55,7 +64,14 @@ export async function loadGarden(t: Date): Promise<Data> {
     for (const id of found.modules) milestones.defeatedAt.set(id, at)
     beds = build(milestones)
   }
-  return { beds, dead }
+  const announce = finds.filter((f) => f.researchedAt !== null && !f.told)
+  return { beds, dead, finds, design, announce }
+}
+
+/** „1 Fund erforscht!“ / „N Funde erforscht!“ – je Stück einmal gezählt. */
+export function researchNotice(announce: FindStatus[]): string | null {
+  const n = new Set(announce.map((f) => f.item)).size
+  return n === 0 ? null : n === 1 ? '1 Fund erforscht!' : `${n} Funde erforscht!`
 }
 
 export function plantSign(p: PlantView, moduleName: string): string {
@@ -92,6 +108,11 @@ const FLIGHTS = [
 ]
 
 export function GreenhouseScreen({ now = () => new Date(), sync, refreshKey = 0, onCamp, onSettings, onSyncNow, onCreateCards, onCollection }: Props) {
+  const [design, setDesign] = useState(false)
+  const [picking, setPicking] = useState<GardenSlot | null>(null)
+  const [soilFor, setSoilFor] = useState<BedView | null>(null)
+  const [soilError, setSoilError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [retry, setRetry] = useState(0)
@@ -106,6 +127,14 @@ export function GreenhouseScreen({ now = () => new Date(), sync, refreshKey = 0,
         if (cancelled) return
         setError(null)
         setData(d)
+        const text = researchNotice(d.announce)
+        setNotice(text)
+        if (text) {
+          markTold(
+            d.announce.map((f) => f.id),
+            now(),
+          ).catch(() => {})
+        }
       })
       .catch((e) => {
         if (!cancelled) setError(`Die Daten konnten nicht geladen werden: ${e instanceof Error ? e.message : String(e)}`)
@@ -136,6 +165,54 @@ export function GreenhouseScreen({ now = () => new Date(), sync, refreshKey = 0,
   }
 
   const v = GARDEN_VIEWS[view]
+  const owned = collection(data.finds)
+  const dung = fertilizer(data.finds, data.design.soil.values())
+  const soilOf = (moduleId: string) => data.design.soil.get(moduleId) ?? 0
+  const reload = () => setRetry((r) => r + 1)
+  const pick = async (slot: GardenSlot, itemId: string | null) => {
+    setPicking(null)
+    try {
+      await placeItem(slot.id, itemId, data.design, now())
+    } finally {
+      reload()
+    }
+  }
+  const improve = async (bed: BedView) => {
+    setSoilError(null)
+    try {
+      await raiseSoil(bed.module.id, now())
+      reload()
+    } catch (e) {
+      setSoilError(e instanceof Error ? e.message : String(e))
+    }
+  }
+  const renderSlot = (slot: GardenSlot) => {
+    const placed = data.design.placements.get(slot.id)
+    const item = placed ? itemById(placed) : undefined
+    const style = { left: `${slot.x}%`, top: `${slot.y}%`, width: `${slot.w}%` }
+    const deco = item && (
+      <div className={`glow soft rarity-${item.rarity}`}>
+        <img src={findImage(item.id)} alt={item.name} draggable={false} />
+      </div>
+    )
+    if (!design) return item ? <div key={slot.id} className="deco" style={style}>{deco}</div> : null
+    return (
+      <button
+        key={slot.id}
+        type="button"
+        className={`deco slot-mark ${slot.size}`}
+        style={style}
+        aria-label={`Platz ${slot.id}: ${item ? item.name : 'leer'}`}
+        onClick={(e) => {
+          e.stopPropagation()
+          setSoilFor(null)
+          setPicking(slot)
+        }}
+      >
+        {deco}
+      </button>
+    )
+  }
   const near = view === 'beetL' || view === 'beetR'
   // Linkes Beet = 1., 3., 5. … Modul, rechtes Beet = 2., 4., … Modul.
   const sides: Record<Side, BedView[]> = {
@@ -156,6 +233,8 @@ export function GreenhouseScreen({ now = () => new Date(), sync, refreshKey = 0,
     if (to) {
       setView(to)
       setSign(null)
+      setPicking(null)
+      setSoilFor(null)
     }
   }
   const turnPage = (side: Side, delta: number) => {
@@ -194,9 +273,9 @@ export function GreenhouseScreen({ now = () => new Date(), sync, refreshKey = 0,
             <button
               key={p.topic.id}
               type="button"
-              className={`plant stage-${p.stage}`}
+              className={`plant stage-${p.stage} soil-${soilOf(bed!.module.id)}`}
               aria-label={p.topic.name}
-              style={{ left: `${s.x}%`, top: `${s.y}%`, width: `${s.size}%` }}
+              style={{ left: `${s.x}%`, top: `${s.y}%`, width: `${s.size * (1 + 0.08 * soilOf(bed!.module.id))}%` }}
               onClick={(e) => {
                 e.stopPropagation()
                 setSign(plantSign(p, bed!.module.name))
@@ -206,9 +285,26 @@ export function GreenhouseScreen({ now = () => new Date(), sync, refreshKey = 0,
             </button>
           )
         })}
-        <span className={`bed-sign${near ? ' near' : ''}`} style={{ left: `${cx}%`, top: `${area.y + area.h + (near ? 9 : 4)}%` }}>
-          {label}
-        </span>
+        {design ? (
+          <button
+            type="button"
+            className={`bed-sign edit${near ? ' near' : ''}`}
+            style={{ left: `${cx}%`, top: `${area.y + area.h + (near ? 9 : 4)}%` }}
+            aria-label={`Erde von ${bed.module.name} verbessern`}
+            onClick={(e) => {
+              e.stopPropagation()
+              setPicking(null)
+              setSoilError(null)
+              setSoilFor(bed!)
+            }}
+          >
+            {label}
+          </button>
+        ) : (
+          <span className={`bed-sign${near ? ' near' : ''}`} style={{ left: `${cx}%`, top: `${area.y + area.h + (near ? 9 : 4)}%` }}>
+            {label}
+          </span>
+        )}
       </div>
     )
   }
@@ -221,6 +317,7 @@ export function GreenhouseScreen({ now = () => new Date(), sync, refreshKey = 0,
     <section className="greenhouse">
       <div className="scene" onClick={() => setSign(null)}>
         <img className={`scene-backdrop${v.mirror ? ' mirror' : ''}`} src={v.image} alt="" draggable={false} />
+        {GARDEN_SLOTS.filter((sl) => sl.view === view).map(renderSlot)}
         {v.beds.map(renderBed)}
         {FLIGHTS.slice(0, insects).map((f, i) => (
           <span
@@ -249,6 +346,60 @@ export function GreenhouseScreen({ now = () => new Date(), sync, refreshKey = 0,
             {sign}
           </p>
         )}
+        {notice && !sign && (
+          <p className="plant-sign found-sign" role="status" onClick={() => setNotice(null)}>
+            {notice}
+          </p>
+        )}
+        {picking && (
+          <div className="slot-picker card-panel" role="dialog" aria-label="Stück wählen" onClick={(e) => e.stopPropagation()}>
+            <div className="picker-list">
+              {[...owned.values()]
+                .filter((o) => o.researched && (picking.size === 'large' || itemSize(o.item) === 'small'))
+                .map((o) => {
+                  const elsewhere = [...data.design.placements].some(([slot, item]) => item === o.item.id && slot !== picking.id)
+                  return (
+                    <button key={o.item.id} type="button" aria-label={o.item.name} onClick={() => void pick(picking, o.item.id)}>
+                      <span className={`glow soft rarity-${o.item.rarity}`}>
+                        <img src={findImage(o.item.id)} alt="" draggable={false} />
+                      </span>
+                      <span>{o.item.name}</span>
+                      {elsewhere && <span className="muted">steht schon woanders</span>}
+                    </button>
+                  )
+                })}
+            </div>
+            <div className="row">
+              <button type="button" onClick={() => void pick(picking, null)}>
+                Leer
+              </button>
+              <button type="button" onClick={() => setPicking(null)}>
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        )}
+        {soilFor && (
+          <div className="soil-panel card-panel" role="dialog" aria-label="Erde verbessern" onClick={(e) => e.stopPropagation()}>
+            <p>{soilFor.module.name}</p>
+            <p>{`Erde: Stufe ${soilOf(soilFor.module.id)}/${MAX_SOIL} · Dünger: ${dung}`}</p>
+            {soilOf(soilFor.module.id) >= MAX_SOIL ? (
+              <p>Beste Erde erreicht</p>
+            ) : (
+              <button type="button" className="primary" disabled={dung < SOIL_COST[soilOf(soilFor.module.id)]!} onClick={() => void improve(soilFor)}>
+                {`Verbessern (${SOIL_COST[soilOf(soilFor.module.id)]} Dünger)`}
+              </button>
+            )}
+            {soilError && (
+              <p role="alert" className="warn">
+                {soilError}
+              </p>
+            )}
+            <button type="button" onClick={() => setSoilFor(null)}>
+              Schließen
+            </button>
+          </div>
+        )}
       </div>
       {data.beds.length === 0 && (
         <div className="center empty-beds">
@@ -260,6 +411,24 @@ export function GreenhouseScreen({ now = () => new Date(), sync, refreshKey = 0,
           )}
         </div>
       )}
+      <div className="garden-tools row">
+        {onCollection && (
+          <button type="button" onClick={onCollection}>
+            Sammelbuch
+          </button>
+        )}
+        <button
+          type="button"
+          aria-pressed={design}
+          onClick={() => {
+            setDesign((d) => !d)
+            setPicking(null)
+            setSoilFor(null)
+          }}
+        >
+          {design ? 'Fertig' : 'Gestalten'}
+        </button>
+      </div>
       <nav className="garden-nav" aria-label="Gehen">
         {MOVES.map(({ move, label, cls }) =>
           move === 'forward' && v.door ? (
