@@ -6,14 +6,15 @@ type Row = Record<string, unknown> & { synced_at: string }
 
 /** Minimaler PostgREST-Ersatz: gte / or-Keyset / order / limit, mit serverseitigem max_rows. */
 function stubClient(data: Record<string, Row[]>, maxRows: number, failWith?: { status: number; message: string; table?: string }) {
-  const calls: { table: string; gte?: string; or?: string }[] = []
+  const calls: { table: string; gte?: string; or?: string; not?: string }[] = []
   const client = {
     from(table: string) {
-      const call: { table: string; gte?: string; or?: string } = { table }
+      const call: { table: string; gte?: string; or?: string; not?: string } = { table }
       let limit = Infinity
       let keyCol = 'id'
       const b = {
         select: () => b,
+        not: (c: string, op: string, v: null) => ((call.not = `${c}.${op}.${v}`), b),
         gte: (_c: string, v: string) => ((call.gte = v), b),
         or: (s: string) => ((call.or = s), b),
         order: (c: string) => (c !== 'synced_at' && (keyCol = c), b),
@@ -29,6 +30,7 @@ function stubClient(data: Record<string, Row[]>, maxRows: number, failWith?: { s
             const m = /^synced_at\.gt\."([^"]+)",and\(synced_at\.eq\."([^"]+)",\w+\.gt\.([^)]+)\)$/.exec(call.or)!
             rows = rows.filter((r) => r.synced_at > m[1]! || (r.synced_at === m[2] && String(r[keyCol]) > m[3]!))
           } else if (call.gte) rows = rows.filter((r) => r.synced_at >= call.gte!)
+          if (call.not === 'confidence.is.null') rows = rows.filter((r) => r.confidence != null)
           return resolve({ data: rows.slice(0, Math.min(limit, maxRows)), error: null, status: 200 })
         },
       }
@@ -40,7 +42,7 @@ function stubClient(data: Record<string, Row[]>, maxRows: number, failWith?: { s
 
 const base = { module_id: 'm', name: 'n', updated_at: '2026-03-10T11:00:00+01:00' }
 const epoch = '1970-01-01T00:00:00.000Z'
-const since = { modules: epoch, topics: epoch, cards: epoch, states: epoch, game: epoch }
+const since = { modules: epoch, topics: epoch, cards: epoch, states: epoch, game: epoch, logs: epoch }
 
 describe('createSupabaseRemote.pullSince', () => {
   it('Server liefert Seiten kleiner als angefragt: nichts wird übersprungen, auch bei gleichem synced_at', async () => {
@@ -137,5 +139,29 @@ describe('Spieldaten (game_items)', () => {
     expect(calls).toEqual([
       { table: 'game_items', rows: [{ id: 'rest', data: { at: 'x' }, updated_at: '2026-03-10T10:00:00.000Z' }], opts: { onConflict: 'user_id,id' } },
     ])
+  })
+})
+
+describe('Wiederholungen mit Einschätzung (review_logs)', () => {
+  it('holt nur Logs mit Einschätzung und mappt sie', async () => {
+    const review_logs: Row[] = [
+      { id: 'l1', user_id: 'u', card_id: 'c1', rating: 2, reviewed_at: '2026-03-10T11:00:00+01:00', study_day: '2026-03-10', elapsed_days: 1, confidence: 'unsure', outcome: 'right', synced_at: '2026-03-10T10:00:01+00:00' },
+      { id: 'l2', user_id: 'u', card_id: 'c1', rating: 3, reviewed_at: '2026-03-10T11:00:00+01:00', study_day: '2026-03-10', elapsed_days: 1, confidence: null, outcome: null, synced_at: '2026-03-10T10:00:02+00:00' },
+    ]
+    const { client, calls } = stubClient({ review_logs }, 10)
+    const res = await createSupabaseRemote(client).pullSince(since)
+    expect(res.logs).toEqual([
+      { id: 'l1', cardId: 'c1', rating: 2, reviewedAt: '2026-03-10T10:00:00.000Z', studyDay: '2026-03-10', elapsedDays: 1, confidence: 'unsure', outcome: 'right' },
+    ])
+    expect(res.cursors.logs).toBe('2026-03-10T10:00:01.000Z')
+    expect(calls.find((c) => c.table === 'review_logs')?.not).toBe('confidence.is.null')
+  })
+
+  it('Spalten fehlen noch: Fehler gemeldet, Rest kommt', async () => {
+    const { client } = stubClient({}, 10, { status: 400, message: 'column review_logs.confidence does not exist', table: 'review_logs' })
+    const res = await createSupabaseRemote(client).pullSince(since)
+    expect(res.logs).toEqual([])
+    expect(res.cursors.logs).toBeUndefined()
+    expect(res.logsError).toMatch(/confidence/)
   })
 })

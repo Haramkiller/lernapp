@@ -13,7 +13,7 @@ export type OutboxEntry =
   | { id?: number; kind: 'game'; payload: GameItem }
 /** Dauerhaft abgelehnte Outbox-Einträge (4xx): Quarantäne, damit der Rest weiter synchronisiert. */
 export type DeadEntry = { id?: number; kind: 'state' | 'log' | 'game'; payload: StateRow | LogEntry | GameItem; error: string }
-/** Schlüssel: `lastPull:<tabelle>`, `settings`, `supabaseOverride`, `newDone:<studyDay>`, `owner`, `signedIn` (siehe account.ts). */
+/** Schlüssel: `lastPull:<tabelle>` (auch `lastPull:logs`), `settings`, `supabaseOverride`, `newDone:<studyDay>`, `owner`, `signedIn` (siehe account.ts). */
 export type MetaEntry = { key: string; value: unknown }
 
 export class LernDb extends Dexie {
@@ -25,6 +25,8 @@ export class LernDb extends Dexie {
   meta!: Table<MetaEntry, string>
   dead!: Table<DeadEntry, number>
   game!: Table<GameItem, string>
+  /** Wiederholungen mit Einschätzung (eigene und von anderen Geräten), für die Treffsicherheit. */
+  logs!: Table<LogEntry, string>
 
   constructor() {
     super('lernapp')
@@ -38,6 +40,7 @@ export class LernDb extends Dexie {
     })
     this.version(2).stores({ dead: '++id' })
     this.version(3).stores({ game: 'id' })
+    this.version(4).stores({ logs: 'id, cardId, reviewedAt' })
   }
 }
 

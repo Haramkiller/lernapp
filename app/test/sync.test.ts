@@ -11,7 +11,7 @@ import { newDoneKey } from '../src/session/queue'
  * In-Memory-Server: bedingter Upsert (älteres updated_at wird ignoriert, wie der DB-Trigger) und ein
  * streng wachsendes synced_at (Serverzeit, 10 s Abstand), das nur bei angenommenen Schreibvorgängen vergeben wird.
  */
-function fakeRemote(opts: { fail?: boolean; failPush?: boolean; poison?: string[]; pushError?: RemoteError; gameError?: string } = {}) {
+function fakeRemote(opts: { fail?: boolean; failPush?: boolean; poison?: string[]; pushError?: RemoteError; gameError?: string; pulledLogs?: LogEntry[]; logsError?: string } = {}) {
   let clock = Date.parse('2026-03-10T00:00:00Z')
   type Row = { item: { updatedAt: string }; syncedAt: string }
   const tables: Record<SyncTable, Map<string, Row>> = {
@@ -20,6 +20,7 @@ function fakeRemote(opts: { fail?: boolean; failPush?: boolean; poison?: string[
     cards: new Map(),
     states: new Map(),
     game: new Map(),
+    logs: new Map(),
   }
   const r = {
     fail: opts.fail ?? false,
@@ -37,7 +38,7 @@ function fakeRemote(opts: { fail?: boolean; failPush?: boolean; poison?: string[
     state: (cardId: string) => tables.states.get(cardId)?.item as StateRow | undefined,
     async pullSince(since: Cursors): Promise<Pulled> {
       if (r.fail) throw new Error('offline')
-      const out: Record<SyncTable, unknown[]> = { modules: [], topics: [], cards: [], states: [], game: [] }
+      const out: Record<SyncTable, unknown[]> = { modules: [], topics: [], cards: [], states: [], game: [], logs: [] }
       const cursors: Partial<Cursors> = {}
       for (const t of Object.keys(tables) as SyncTable[]) {
         for (const row of tables[t].values()) {
@@ -45,6 +46,14 @@ function fakeRemote(opts: { fail?: boolean; failPush?: boolean; poison?: string[
           out[t].push(row.item)
           if (!cursors[t] || row.syncedAt > cursors[t]!) cursors[t] = row.syncedAt
         }
+      }
+      if (opts.pulledLogs) {
+        out.logs = opts.pulledLogs
+        cursors.logs = '2026-03-10T12:00:00.000Z'
+      }
+      if (opts.logsError) {
+        out.logs = []
+        return { ...out, cursors, logsError: opts.logsError } as unknown as Pulled
       }
       if (opts.gameError) {
         out.game = []
@@ -347,5 +356,38 @@ describe('sync: Spieldaten', () => {
     expect((await db.game.get('area:m1'))?.data.bossId).toBe('server')
     expect((await db.game.get('area:m2'))?.data.bossId).toBe('lokal-neu')
     expect((await db.meta.get('lastPull:game'))?.value).toBe(remote.syncedAt('game', 'area:m2'))
+  })
+})
+
+describe('Logs mit Einschätzung', () => {
+  const entry = (id: string, over: Partial<LogEntry> = {}): LogEntry => ({
+    id, cardId: 'c1', rating: 3, reviewedAt: T1.toISOString(), studyDay: '2026-03-10', elapsedDays: 0, confidence: 'sure', outcome: 'right', ...over,
+  })
+  beforeEach(async () => {
+    await Promise.all([db.logs.clear(), db.outbox.clear(), db.states.clear(), db.cards.clear(), db.meta.clear()])
+  })
+
+  it('recordReview legt Logs mit Einschätzung auch lokal ab, ohne nicht', async () => {
+    const r = review(newSrsState(T1), 3, T1, { cardId: 'c1' })
+    await recordReview('c1', { ...r, log: { ...r.log, confidence: 'sure', outcome: 'right' } })
+    await recordReview('c2', review(newSrsState(T1), 3, T1, { cardId: 'c2' }))
+    const all = await db.logs.toArray()
+    expect(all).toHaveLength(1)
+    expect(all[0]).toMatchObject({ cardId: 'c1', confidence: 'sure', outcome: 'right' })
+  })
+
+  it('gepullte Logs werden ohne Doppel übernommen', async () => {
+    await db.logs.put(entry('l1'))
+    const remote = fakeRemote({ pulledLogs: [entry('l1'), entry('l2', { cardId: 'c9' })] })
+    await sync(remote, T2)
+    expect(await db.logs.count()).toBe(2)
+    expect((await db.meta.get('lastPull:logs'))?.value).toBe('2026-03-10T12:00:00.000Z')
+  })
+
+  it('Fehler beim Holen der Logs hält den Sync nicht auf', async () => {
+    const remote = fakeRemote({ logsError: 'column confidence does not exist' })
+    remote.put('cards', 'k1', card('k1'))
+    await expect(sync(remote, T2)).resolves.toBeDefined()
+    expect(await db.cards.get('k1')).toBeDefined()
   })
 })

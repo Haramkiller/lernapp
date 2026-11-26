@@ -16,7 +16,7 @@ export async function recordReview(
   cardId: string,
   compute: ReviewResult | ((prev: SrsState | undefined) => ReviewResult),
 ): Promise<ReviewResult> {
-  return db.transaction('rw', db.states, db.outbox, db.meta, async () => {
+  return db.transaction('rw', [db.states, db.outbox, db.meta, db.logs], async () => {
     const prev = (await db.states.get(cardId))?.state
     const result = typeof compute === 'function' ? compute(prev) : compute
     const { state, log } = result
@@ -27,6 +27,7 @@ export async function recordReview(
       { kind: 'state', payload: row },
       { kind: 'log', payload: entry },
     ])
+    if (entry.confidence) await db.logs.put(entry)
     if (prev === undefined) {
       const key = newDoneKey(new Date(log.reviewedAt))
       const done = ((await db.meta.get(key))?.value as number | undefined) ?? 0
@@ -149,7 +150,7 @@ async function applyNewer<T extends { updatedAt: string }>(
   return applied
 }
 
-const TABLES: SyncTable[] = ['modules', 'topics', 'cards', 'states', 'game']
+const TABLES: SyncTable[] = ['modules', 'topics', 'cards', 'states', 'game', 'logs']
 const EPOCH = '1970-01-01T00:00:00.000Z'
 /** Überlappung beim Pull: fängt Transaktionen ab, die mit älterem `synced_at` später sichtbar werden. */
 export const PULL_OVERLAP_MS = 5000
@@ -170,13 +171,16 @@ export async function sync(
   // Pull läuft auch, wenn der Push scheiterte; ein Pull-Fehler bricht den Sync ab.
   const incoming = await remote.pullSince(since)
 
-  const pulled = await db.transaction('rw', [db.modules, db.topics, db.cards, db.states, db.game, db.meta], async () => {
+  const pulled = await db.transaction('rw', [db.modules, db.topics, db.cards, db.states, db.game, db.logs, db.meta], async () => {
     let n = 0
     n += await applyNewer(incoming.modules, (m) => db.modules.get(m.id), (m) => db.modules.put(m))
     n += await applyNewer(incoming.topics, (t) => db.topics.get(t.id), (t) => db.topics.put(t))
     n += await applyNewer(incoming.cards, (c) => db.cards.get(c.id), (c) => db.cards.put(c))
     n += await applyNewer(incoming.states, (s) => db.states.get(s.cardId), (s) => db.states.put(s))
     n += await applyNewer(incoming.game, (g) => db.game.get(g.id), (g) => db.game.put(g))
+    // Logs sind unveränderlich: Schlüssel id, doppelt geholte überschreiben sich selbst.
+    const logs = (incoming.logs ?? []).filter((l) => l.confidence)
+    if (logs.length) await db.logs.bulkPut(logs)
     for (const t of TABLES) {
       const next = incoming.cursors[t]
       if (next && Date.parse(next) > Date.parse(cursors[t])) await db.meta.put({ key: cursorKey(t), value: next })

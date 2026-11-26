@@ -119,6 +119,17 @@ begin
 end
 $$;
 
+-- Teil 5b: Einschätzung vor dem Aufdecken. Nullbar, damit alte Einträge und alte App-Versionen gültig bleiben.
+-- synced_at (Serverzeit) erlaubt den Geräten, Logs mit Einschätzung zurückzuholen.
+alter table public.review_logs
+  add column if not exists confidence text check (confidence in ('sure', 'unsure')),
+  add column if not exists outcome text check (outcome in ('right', 'partial', 'wrong')),
+  add column if not exists synced_at timestamptz not null default clock_timestamp();
+create index if not exists review_logs_user_synced_idx on public.review_logs (user_id, synced_at, id);
+drop trigger if exists review_logs_synced_insert on public.review_logs;
+create trigger review_logs_synced_insert before insert on public.review_logs
+  for each row execute function public.set_synced_at();
+
 -- Row Level Security: je Tabelle und Operation eine Policy (nur eigene Zeilen).
 alter table public.modules enable row level security;
 alter table public.topics enable row level security;

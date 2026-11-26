@@ -16,8 +16,8 @@ export const OWNER_CHANGE_WARNING =
 const sameOwner = (a: Owner, b: Owner) => a.url === b.url && a.userId === b.userId
 
 async function clearUserData(owner: Owner): Promise<void> {
-  await db.transaction('rw', [db.modules, db.topics, db.cards, db.states, db.outbox, db.dead, db.meta], async () => {
-    await Promise.all([db.modules.clear(), db.topics.clear(), db.cards.clear(), db.states.clear(), db.outbox.clear(), db.dead.clear()])
+  await db.transaction('rw', [db.modules, db.topics, db.cards, db.states, db.outbox, db.dead, db.logs, db.meta], async () => {
+    await Promise.all([db.modules.clear(), db.topics.clear(), db.cards.clear(), db.states.clear(), db.outbox.clear(), db.dead.clear(), db.logs.clear()])
     const keys = (await db.meta.toCollection().primaryKeys()) as string[]
     await db.meta.bulkDelete(keys.filter((k) => USER_DATA_PREFIXES.some((p) => k.startsWith(p))))
     await db.meta.put({ key: OWNER_KEY, value: owner })

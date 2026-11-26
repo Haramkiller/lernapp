@@ -143,6 +143,18 @@ export const rowToState = <S>(r: StateDbRow<S>): StateEntry<S> => ({
   updatedAt: isoUtc(r.updated_at),
 })
 
+/** Für das Zurückholen der Logs mit Einschätzung (Teil 5b). */
+export const rowToLog = (r: LogRow): LogInput => ({
+  id: r.id,
+  cardId: r.card_id,
+  rating: r.rating,
+  reviewedAt: isoUtc(r.reviewed_at),
+  studyDay: r.study_day,
+  elapsedDays: r.elapsed_days,
+  ...(r.confidence ? { confidence: r.confidence } : {}),
+  ...(r.outcome ? { outcome: r.outcome } : {}),
+})
+
 export const logToRow = (l: LogInput): LogRow => ({
   id: l.id,
   card_id: l.cardId,

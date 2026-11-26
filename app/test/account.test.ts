@@ -52,6 +52,7 @@ describe('ensureOwner', () => {
     await db.meta.put({ key: 'owner', value: A })
     await seedUserData()
     await db.dead.add({ kind: 'log', payload: { id: 'l', cardId: 'c1', rating: 3, reviewedAt: 'r', studyDay: 'd', elapsedDays: 0 }, error: 'x' })
+    await db.logs.put({ id: 'l', cardId: 'c1', rating: 3, reviewedAt: 'r', studyDay: 'd', elapsedDays: 0, confidence: 'sure', outcome: 'right' })
     const confirm = vi.fn()
     const other = { url: A.url, userId: 'u2' }
     expect(await ensureOwner(other, confirm)).toBe(true)
@@ -59,6 +60,7 @@ describe('ensureOwner', () => {
     expect(await db.cards.count()).toBe(0)
     expect(await db.modules.count()).toBe(0)
     expect(await db.dead.count()).toBe(0)
+    expect(await db.logs.count()).toBe(0)
     expect(await db.meta.get('lastPull:cards')).toBeUndefined()
     expect(await db.meta.get('newDone:2026-03-10')).toBeUndefined()
     expect((await db.meta.get('owner'))?.value).toEqual(other)
