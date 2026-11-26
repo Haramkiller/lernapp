@@ -4,7 +4,10 @@ import { db } from '../data/db'
 import { loadSettings } from '../data/settings'
 import { recordReview } from '../data/sync'
 import { LUCKY_CHANCE, RESTED_LUCKY_CHANCE, applyAnswer, defeated, endBattle, hpPercent, startBattle, type Battle } from '../game/battle'
-import { bossFor, type AreaChoices } from '../game/bosses'
+import { bossFor, regionForModule, type AreaChoices } from '../game/bosses'
+import { EMPTY_RUN, countsForLoot, nextDrops, rollFind, type LootRun } from '../game/finds'
+import { researchByAnswer, saveFind } from '../data/finds'
+import { studyDay } from '@lernapp/shared'
 import { bossLife, cardLife, isPlayable, shownLife } from '../game/mastery'
 import { ALL_MODULES, loadAreaChoices, loadBossLife, saveBossLife } from '../data/game'
 import { buildQueue, newDoneKey, type Settings } from '../session/queue'
@@ -76,6 +79,9 @@ export function BattleScreen({
   const [ended, setEnded] = useState(false)
   const [asking, setAsking] = useState(false)
   const [saving, setSaving] = useState(false)
+  /** Zähler für den Blitz „✨ Fund!“ (neuer Schlüssel = Animation startet neu). */
+  const [flash, setFlash] = useState(0)
+  const loot = useRef<LootRun>(EMPTY_RUN)
   const settings = useRef<Settings | null>(null)
   const busy = useRef(false)
   const finished = useRef(false)
@@ -218,7 +224,30 @@ export function BattleScreen({
       // Erst eine gespeicherte Antwort zählt im Kampf.
       const before = cardLife(prev, t, retention)
       const after = cardLife(res.state, t, retention)
-      setBattle(applyAnswer(battle, { outcome, elapsedDays: elapsedDays(prev, t), before, after }, rng, rested ? RESTED_LUCKY_CHANCE : LUCKY_CHANCE))
+      const nb = applyAnswer(battle, { outcome, elapsedDays: elapsedDays(prev, t), before, after }, rng, rested ? RESTED_LUCKY_CHANCE : LUCKY_CHANCE)
+      setBattle(nb)
+      // Funde: nur für Karten, die heute zum ersten Mal richtig beantwortet werden; Fehler halten den Kampf nicht auf.
+      const { run, drops } = nextDrops(loot.current, { counts: countsForLoot(prev, outcome, t), combo: nb.combo }, rested)
+      loot.current = run
+      const region = regionForModule(card.moduleId, modules, areas)
+      for (const kind of drops) {
+        const item = rollFind(kind, rested, region, rng)
+        saveFind({
+          id: crypto.randomUUID(),
+          item: item.id,
+          rarity: item.rarity,
+          region,
+          cardId: card.id,
+          topicId: card.topicId,
+          moduleId: card.moduleId,
+          foundAt: t.toISOString(),
+          foundDay: studyDay(t),
+        }).then(
+          () => setFlash((n) => n + 1),
+          () => {},
+        )
+      }
+      if (outcome !== 'wrong') researchByAnswer(card.id, t).catch(() => {})
       setTurn((n) => n + 1)
       setCounts((c) => ({ ...c, [outcome]: c[outcome] + 1 }))
       setResult({ outcome, answer: detail })
@@ -241,6 +270,11 @@ export function BattleScreen({
     <section className="battle" ref={top}>
       <Arena boss={boss} name={name} battle={battle} turn={turn} active={result !== null} recovery={recovery} />
       <div className="battle-main">
+        {flash > 0 && (
+          <span key={flash} className="find-flash" role="status">
+            ✨ Fund!
+          </span>
+        )}
         <div className="row between">
           <p className="progress pixel">
             {index + 1} / {cards.length}

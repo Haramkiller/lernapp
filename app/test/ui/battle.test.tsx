@@ -39,8 +39,8 @@ describe('BattleScreen', () => {
     expect(screen.getByText(/5 falsch/)).toBeInTheDocument()
     expect(screen.getByText(/Pause/)).toBeInTheDocument()
     expect(await db.states.count()).toBe(25)
-    // 25 States + 25 Logs + das gespeicherte Endleben des Bosses
-    await vi.waitFor(async () => expect(await db.outbox.count()).toBe(51))
+    // 25 States + 25 Logs + 1 Fund (dritte richtige Antwort) + das gespeicherte Endleben des Bosses
+    await vi.waitFor(async () => expect(await db.outbox.count()).toBe(52))
     expect(onFinished).toHaveBeenCalledTimes(1)
   })
 

@@ -1433,3 +1433,40 @@ button.cta:disabled {
 .greenhouse .scene {
   max-width: min(480px, max(280px, calc((100dvh - 190px) * 0.75)));
 }
+
+/* ---------------- Fundstücke ---------------- */
+.battle-main {
+  position: relative;
+}
+.find-flash {
+  position: absolute;
+  z-index: 6;
+  top: 0;
+  left: 50%;
+  padding: 6px 14px;
+  border: 2px solid #000;
+  border-radius: 999px;
+  background: #ffcf4a;
+  color: #2a1a00;
+  font-family: var(--pixel);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: find-flash 1.2s ease-out forwards;
+}
+@keyframes find-flash {
+  0% { opacity: 0; transform: translate(-50%, 6px) scale(0.6); }
+  20% { opacity: 1; transform: translate(-50%, -4px) scale(1.15); }
+  70% { opacity: 1; transform: translate(-50%, -10px) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -18px) scale(1); }
+}
+@keyframes find-fade {
+  0%, 70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .find-flash {
+    transform: translateX(-50%);
+    animation: find-fade 1.2s ease-out forwards;
+  }
+}
