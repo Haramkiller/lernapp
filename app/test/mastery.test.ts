@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { Card, Topic } from '@lernapp/shared'
-import { CARD_LIFE, bossLife, cardLife, dailyQuest, isLearned, isPlayable, isSecure, lifePercent, topicStatus } from '../src/game/mastery'
+import { CARD_LIFE, bossLife, cardLife, dailyQuest, isLearned, isPlayable, isSecure, isTypedReady, lifePercent, topicStatus } from '../src/game/mastery'
 import { newSrsState, review, type SrsState } from '../src/srs/scheduler'
-import { choiceCard } from './ui/fixtures'
+import { choiceCard, clozeCard } from './ui/fixtures'
+import { State } from 'ts-fsrs'
 
 const NOW = new Date('2026-03-10T10:00:00.000Z')
 const DAY = 24 * 60 * 60 * 1000
@@ -138,5 +139,29 @@ describe('dailyQuest', () => {
     const cards = [choiceCard('a', { deleted: true })]
     const states = new Map([['a', learned('a', NOW, 4)]])
     expect(dailyQuest({ cards, states, newDoneToday: 0, now: NOW, settings })).toEqual({ done: 0, total: 0 })
+  })
+})
+
+describe('isTypedReady', () => {
+  const typedCard = (typed: unknown = { answers: ['Richtig B'] }) => {
+    const c = choiceCard('a')
+    return { ...c, payload: { ...c.payload, typed } } as Card
+  }
+  const st = (over: Partial<SrsState>): SrsState => ({ ...secure('a'), state: State.Review, stability: 7, ...over })
+
+  it('Review und Stabilität ≥ 7 Tage mit Kernantwort → Eingabe', () => {
+    expect(isTypedReady(typedCard(), st({}))).toBe(true)
+    expect(isTypedReady(typedCard(), st({ stability: 30, due: new Date(NOW.getTime() - 10 * DAY).toISOString() }))).toBe(true)
+  })
+  it('zu wenig Stabilität, Lernen, Wiederlernen, ohne State → Auswahl', () => {
+    expect(isTypedReady(typedCard(), st({ stability: 6.9 }))).toBe(false)
+    expect(isTypedReady(typedCard(), st({ state: State.Relearning, stability: 30 }))).toBe(false)
+    expect(isTypedReady(typedCard(), st({ state: State.Learning, stability: 30 }))).toBe(false)
+    expect(isTypedReady(typedCard(), undefined)).toBe(false)
+  })
+  it('ohne Kernantwort oder andere Kartentypen → nie', () => {
+    expect(isTypedReady(typedCard(null), st({ stability: 30 }))).toBe(false)
+    expect(isTypedReady(choiceCard('a'), st({ stability: 30 }))).toBe(false)
+    expect(isTypedReady(clozeCard('z'), st({ stability: 30 }))).toBe(false)
   })
 })

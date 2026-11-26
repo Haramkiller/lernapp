@@ -1,5 +1,5 @@
 import { State } from 'ts-fsrs'
-import { CardDraftSchema, studyDay, type Card, type Topic } from '@lernapp/shared'
+import { CardDraftSchema, studyDay, typedAnswers, type Card, type Topic } from '@lernapp/shared'
 import { recall, type SrsState } from '../srs/scheduler'
 import { buildQueue, type Settings } from '../session/queue'
 
@@ -14,6 +14,12 @@ export function isLearned(s: SrsState | undefined): s is SrsState {
 /** Sitzt sicher: gelernt, Abruf ≥ Zielwert und Stabilität ≥ SECURE_STABILITY_DAYS. */
 export function isSecure(s: SrsState | undefined, now: Date, retention: number): boolean {
   return isLearned(s) && s.stability >= SECURE_STABILITY_DAYS && recall(s, now) >= retention
+}
+
+/** Auswahlkarte mit Kernantwort, die sitzt (Wiederholung, Stabilität ≥ 7 Tage) → wird eingetippt. */
+export function isTypedReady(card: Card, state: SrsState | undefined): boolean {
+  return card.type === 'choice' && typedAnswers(card.payload) !== null
+    && state?.state === State.Review && state.stability >= SECURE_STABILITY_DAYS
 }
 
 export type TopicStatus = { topic: Topic; total: number; due: number; fresh: number; secure: boolean }
