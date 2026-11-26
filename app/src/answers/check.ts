@@ -42,6 +42,26 @@ export function checkCloze(inputs: string[], payload: ClozePayload): { perGap: b
   return { perGap, outcome: ratio(perGap.filter(Boolean).length, perGap.length) }
 }
 
+const ARTICLES = new Set(['der', 'die', 'das', 'den', 'dem', 'des', 'ein', 'eine', 'einen', 'einem', 'einer', 'eines'])
+
+/** Für Eingaben: Satzzeichen weg, Leerraum gefaltet, ein führender Artikel weg. */
+function typedForm(s: string): string {
+  const words = s
+    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+  if (words.length > 1 && ARTICLES.has(words[0]!.toLowerCase())) words.shift()
+  return words.join(' ')
+}
+
+/** Eingetippte Kernantwort: tolerant wie eine Lücke, dazu ohne Satzzeichen und führenden Artikel. */
+export function checkTyped(input: string, answers: string[]): boolean {
+  const given = typedForm(input)
+  if (!given) return false
+  return gapMatches(given, answers.map(typedForm).filter(Boolean))
+}
+
 export function checkChoice(index: number, p: ChoicePayload): Outcome {
   return p.options[index]?.correct ? 'right' : 'wrong'
 }

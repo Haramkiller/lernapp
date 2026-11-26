@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ChoicePayload, ClozePayload, MatchingPayload, OrderPayload } from '@lernapp/shared'
-import { checkChoice, checkCloze, checkMatching, checkOrder } from '../src/answers/check'
+import { checkChoice, checkCloze, checkMatching, checkOrder, checkTyped } from '../src/answers/check'
 
 const gap = (...answers: string[]): ClozePayload => ({ text: '{{1}}', gaps: [{ answers }] })
 const gaps = (...answers: string[]): ClozePayload => ({
@@ -67,4 +67,23 @@ describe('checkOrder', () => {
   it('Reihenfolge mit einer Nachbarvertauschung → partial', () => expect(checkOrder([0, 2, 1, 3], p)).toBe('partial'))
   it('Vertauschung nicht benachbarter Schritte → wrong', () => expect(checkOrder([2, 1, 0, 3], p)).toBe('wrong'))
   it('zwei Vertauschungen → wrong', () => expect(checkOrder([1, 0, 3, 2], p)).toBe('wrong'))
+})
+
+describe('checkTyped', () => {
+  const A = ['Mitochondrien', 'Mitochondrium', 'Kraftwerk der Zelle']
+  it('erkennt Lösung tolerant: Groß/klein, Artikel, Satzzeichen, Tippfehler, Synonym', () => {
+    expect(checkTyped('Mitochondrien', A)).toBe(true)
+    expect(checkTyped('mitochondrien', A)).toBe(true)
+    expect(checkTyped('die Mitochondrien', A)).toBe(true)
+    expect(checkTyped('Mitochondrien.', A)).toBe(true)
+    expect(checkTyped('Mitochondiren', A)).toBe(true)
+    expect(checkTyped('das Kraftwerk der Zelle', A)).toBe(true)
+    expect(checkTyped('ATP', ['ATP', 'Adenosintriphosphat'])).toBe(true)
+  })
+  it('lehnt anderes Wort und leere Eingabe ab; kurze Wörter exakt', () => {
+    expect(checkTyped('Ribosomen', A)).toBe(false)
+    expect(checkTyped('', A)).toBe(false)
+    expect(checkTyped('   ', A)).toBe(false)
+    expect(checkTyped('ADP', ['ATP'])).toBe(false)
+  })
 })
