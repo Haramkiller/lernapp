@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { REGIONS } from '../src/game/bosses'
 import { SPECIES_COUNT } from '../src/game/garden'
 import {
-  CAMP, FOG_IMAGES, GARDEN_SLOTS, GARDEN_VIEWS, MAP_IMAGE, MIN_PLANT_SIZE, REGION_SPOTS, TITLE_IMAGE,
+  CAMP, FOG_IMAGES, GARDEN_SLOTS, dayPhase, GARDEN_VIEWS, MAP_IMAGE, MIN_PLANT_SIZE, REGION_SPOTS, TITLE_IMAGE,
   fireFrames, insectFrames, plantImage, regionIcon, slotPositions, treeImage, type ViewId,
 } from '../src/game/scenes'
 
@@ -128,5 +128,20 @@ describe('Plätze für Fundstücke', () => {
       }
       if (s.view === 'beetL' || s.view === 'beetR') expect(s.y, s.id).toBeLessThanOrEqual(86)
     }
+  })
+})
+
+describe('Tageszeit', () => {
+  it('dayPhase: Grenzen 6, 10, 17, 21 Uhr', () => {
+    const at = (h: number, m = 0) => dayPhase(new Date(2026, 0, 1, h, m))
+    expect(at(5, 59)).toBe('nacht')
+    expect(at(6)).toBe('morgen')
+    expect(at(9, 59)).toBe('morgen')
+    expect(at(10)).toBe('tag')
+    expect(at(16, 59)).toBe('tag')
+    expect(at(17)).toBe('abend')
+    expect(at(20, 59)).toBe('abend')
+    expect(at(21)).toBe('nacht')
+    expect(at(0)).toBe('nacht')
   })
 })

@@ -107,4 +107,18 @@ describe('Gewächshaus gestalten', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Sammelbuch' }))
     expect(onCollection).toHaveBeenCalled()
   })
+
+  it('Farbschicht nach Uhrzeit, nachts Glühwürmchen', async () => {
+    const night = open({ now: () => new Date(2026, 2, 10, 22) })
+    await screen.findByRole('button', { name: 'Gestalten' })
+    expect(document.querySelector('.daylight.phase-nacht')).not.toBeNull()
+    expect(document.querySelector('.scene')).toHaveClass('night')
+    expect(document.querySelectorAll('.firefly').length).toBeGreaterThan(0)
+    night.unmount()
+    open({ now: () => new Date(2026, 2, 10, 12) })
+    await screen.findByRole('button', { name: 'Gestalten' })
+    expect(document.querySelector('.daylight.phase-tag')).not.toBeNull()
+    expect(document.querySelector('.scene')).not.toHaveClass('night')
+    expect(document.querySelectorAll('.firefly')).toHaveLength(0)
+  })
 })

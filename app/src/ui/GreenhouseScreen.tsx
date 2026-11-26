@@ -3,7 +3,7 @@ import { db } from '../data/db'
 import { loadAreaChoices, loadMilestones, recordMilestones } from '../data/game'
 import { loadSettings } from '../data/settings'
 import { bloomCount, buildGarden, newMilestones, type BedView, type Milestones, type PlantView } from '../game/garden'
-import { GARDEN_SLOTS, GARDEN_VIEWS, insectFrames, plantImage, slotPositions, treeImage, type BedArea, type GardenSlot, type Move, type ViewId } from '../game/scenes'
+import { FIREFLIES, GARDEN_SLOTS, GARDEN_VIEWS, dayPhase, insectFrames, plantImage, slotPositions, treeImage, type BedArea, type GardenSlot, type Move, type ViewId } from '../game/scenes'
 import { checkResearch, loadDesign, loadFinds, markTold, placeItem, raiseSoil, type Design } from '../data/finds'
 import { MAX_SOIL, SOIL_COST, collection, fertilizer, findImage, itemById, itemSize, type FindStatus } from '../game/finds'
 import type { SyncStatus } from './CampScreen'
@@ -165,6 +165,7 @@ export function GreenhouseScreen({ now = () => new Date(), sync, refreshKey = 0,
   }
 
   const v = GARDEN_VIEWS[view]
+  const phase = dayPhase(now())
   const owned = collection(data.finds)
   const dung = fertilizer(data.finds, data.design.soil.values())
   const soilOf = (moduleId: string) => data.design.soil.get(moduleId) ?? 0
@@ -315,7 +316,7 @@ export function GreenhouseScreen({ now = () => new Date(), sync, refreshKey = 0,
 
   return (
     <section className="greenhouse">
-      <div className="scene" onClick={() => setSign(null)}>
+      <div className={`scene${phase === 'nacht' ? ' night' : ''}`} onClick={() => setSign(null)}>
         <img className={`scene-backdrop${v.mirror ? ' mirror' : ''}`} src={v.image} alt="" draggable={false} />
         {GARDEN_SLOTS.filter((sl) => sl.view === view).map(renderSlot)}
         {v.beds.map(renderBed)}
@@ -329,6 +330,11 @@ export function GreenhouseScreen({ now = () => new Date(), sync, refreshKey = 0,
             <Sprite frames={insectFrames(i % 2 === 0 ? 'butterfly' : 'bee')} fps={i % 2 === 0 ? 8 : 14} />
           </span>
         ))}
+        <div className={`daylight phase-${phase}`} aria-hidden="true" />
+        {phase === 'nacht' &&
+          FIREFLIES.map((f, i) => (
+            <span key={i} className="firefly" aria-hidden="true" style={{ left: `${f.x}%`, top: `${f.y}%`, animationDelay: `${f.d}s` }} />
+          ))}
         <span className="scene-where">{v.name}</span>
         <SceneMenu sync={sync} dead={data.dead} onSettings={onSettings} onSyncNow={onSyncNow} onCreateCards={onCreateCards} onCollection={onCollection} />
         {side && pages > 1 && (

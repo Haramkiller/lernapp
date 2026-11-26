@@ -1750,3 +1750,54 @@ button.cta:disabled {
     opacity: 0.5;
   }
 }
+/* Tageszeit: Farbschicht über Kulisse, Pflanzen und Deko; Schilder und Menü liegen darüber. */
+.daylight {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  pointer-events: none;
+}
+.daylight.phase-morgen {
+  background: rgba(170, 210, 255, 0.18);
+  mix-blend-mode: soft-light;
+}
+.daylight.phase-tag {
+  background: transparent;
+}
+.daylight.phase-abend {
+  background: rgba(255, 170, 60, 0.22);
+  mix-blend-mode: soft-light;
+}
+.daylight.phase-nacht {
+  background: rgba(20, 30, 90, 0.38);
+  mix-blend-mode: multiply;
+}
+.firefly {
+  position: absolute;
+  z-index: 4;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #f4ff9a;
+  box-shadow: 0 0 6px 3px rgba(230, 255, 120, 0.7);
+  pointer-events: none;
+  animation: firefly 5s ease-in-out infinite;
+}
+@keyframes firefly {
+  0%, 100% { opacity: 0.2; transform: translate(0, 0); }
+  30% { opacity: 1; transform: translate(10px, -8px); }
+  60% { opacity: 0.5; transform: translate(-6px, 6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .firefly {
+    animation: none;
+    opacity: 0.8;
+  }
+}
+/* Über der Tageszeit-Schicht: Bedienelemente und Schilder bleiben ungefärbt. */
+.scene .scene-where,
+.scene .bed-sign,
+.scene .bed-pager,
+.scene .deco.slot-mark {
+  z-index: 5;
+}

@@ -124,3 +124,21 @@ export function slotPositions(area: BedArea, count: number): { x: number; y: num
     return { x: area.x + (col + 0.5 + shift) * gap, y: area.y + (rows === 2 ? row * area.h : area.h / 2), size }
   })
 }
+
+export type DayPhase = 'morgen' | 'tag' | 'abend' | 'nacht'
+
+/** Tageszeit nach der Geräteuhr: Morgen 6–10, Tag 10–17, Abend 17–21, Nacht 21–6 Uhr. */
+export function dayPhase(d: Date): DayPhase {
+  const h = d.getHours()
+  return h >= 6 && h < 10 ? 'morgen' : h >= 10 && h < 17 ? 'tag' : h >= 17 && h < 21 ? 'abend' : 'nacht'
+}
+
+/** Feste Plätze für Glühwürmchen (nachts) in % der Kulisse. */
+export const FIREFLIES = [
+  { x: 18, y: 38, d: 0 },
+  { x: 72, y: 30, d: -1.3 },
+  { x: 44, y: 46, d: -2.7 },
+  { x: 86, y: 52, d: -0.6 },
+  { x: 30, y: 58, d: -3.4 },
+  { x: 60, y: 24, d: -2.1 },
+]
