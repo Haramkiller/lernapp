@@ -1233,6 +1233,12 @@ button.cta:disabled {
 .ask .solution {
   border-radius: 14px;
 }
+.ask .solution p {
+  margin: 6px 0;
+}
+.ask .solution strong {
+  color: var(--right);
+}
 
 /* Ergebnis-Panel */
 .feedback {
