@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ParseError, type Card, type Module, type Topic } from '@lernapp/shared'
-import { prepareImport, questionKey } from '../../src/cards/prepare'
+import { newModule, prepareImport, questionKey } from '../../src/cards/prepare'
 
 const NOW = new Date('2026-11-26T10:00:00.000Z')
 const ids = () => {
@@ -36,7 +36,7 @@ const stored = (question: string, deleted = false): Card =>
 
 describe('prepareImport', () => {
   it('neues Modul: Modul, Themen und Karten mit IDs und Zeitstempeln', () => {
-    const p = prepareImport(answer(choice('A?'), choice('B?', 'Farne')), { kind: 'new', name: ' Botanik ' }, { topics: [], cards: [] }, NOW, ids())
+    const p = prepareImport(answer(choice('A?'), choice('B?', 'Farne')), { kind: 'new', module: newModule(' Botanik ', NOW, () => 'm-new') }, { topics: [], cards: [] }, NOW, ids())
     expect(p.isNewModule).toBe(true)
     expect(p.module).toMatchObject({ name: 'Botanik', examDate: null, styleProfile: null, updatedAt: NOW.toISOString() })
     expect(p.topics.map((t) => t.name)).toEqual(['Moose', 'Farne'])
@@ -80,19 +80,19 @@ describe('prepareImport', () => {
   })
 
   it('gleiche Frage, anderer Typ ist kein Doppel', () => {
-    const p = prepareImport(answer(choice('A?'), free('A?')), { kind: 'new', name: 'B' }, { topics: [], cards: [] }, NOW, ids())
+    const p = prepareImport(answer(choice('A?'), free('A?')), { kind: 'new', module: newModule('B', NOW) }, { topics: [], cards: [] }, NOW, ids())
     expect(p.duplicates).toBe(0)
     expect(questionKey(choice('A?') as never)).not.toBe(questionKey(free('A?') as never))
   })
 
   it('ungültige Karte wird gezählt', () => {
     const bad = { ...choice('X?'), difficulty: 7 }
-    const p = prepareImport(answer(choice('A?'), bad), { kind: 'new', name: 'B' }, { topics: [], cards: [] }, NOW, ids())
+    const p = prepareImport(answer(choice('A?'), bad), { kind: 'new', module: newModule('B', NOW) }, { topics: [], cards: [] }, NOW, ids())
     expect(p.rejected).toBe(1)
     expect(p.found).toBe(1)
   })
 
   it('kein JSON wirft ParseError', () => {
-    expect(() => prepareImport('hallo', { kind: 'new', name: 'B' }, { topics: [], cards: [] }, NOW)).toThrow(ParseError)
+    expect(() => prepareImport('hallo', { kind: 'new', module: newModule('B', NOW) }, { topics: [], cards: [] }, NOW)).toThrow(ParseError)
   })
 })

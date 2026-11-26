@@ -207,4 +207,44 @@ describe('CardImportFlow', () => {
     expect(await screen.findByText('Schritt 3 von 4')).toBeInTheDocument()
     expect(screen.getByLabelText('Antwort von Claude')).toHaveValue(ANSWER)
   })
+
+  it('nach dem Speichern zurück zu Schritt 1: dasselbe Modul, keine Doppel', async () => {
+    const props = setup()
+    await toPaste()
+    await check(ANSWER)
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }))
+    await screen.findByText('3 Karten gespeichert')
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Seiten' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Zurück' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Zurück' }))
+    await screen.findByText('Schritt 1 von 4')
+    await userEvent.click(screen.getByRole('button', { name: 'Weiter' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Weiter' }))
+    await check(ANSWER)
+    expect(await screen.findByText('3 schon vorhanden, übersprungen')).toBeInTheDocument()
+    expect(props.save).toHaveBeenCalledTimes(1)
+  })
+
+  it('neues Modul, Speichern scheitert, erneut prüfen: dieselbe Modul-ID', async () => {
+    let first = true
+    const props = setup({
+      save: async () => {
+        if (first) {
+          first = false
+          throw new Error('Failed to fetch')
+        }
+      },
+    })
+    await toPaste()
+    await check(ANSWER)
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }))
+    await screen.findByRole('alert')
+    await userEvent.click(screen.getByRole('button', { name: 'Zurück' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Prüfen' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }))
+    await screen.findByText('3 Karten gespeichert')
+    const [a, b] = props.save.mock.calls.map((c) => c[0])
+    expect(b!.isNewModule).toBe(true)
+    expect(b!.module.id).toBe(a!.module.id)
+  })
 })

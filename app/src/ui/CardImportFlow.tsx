@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { normalize, ParseError, type Module } from '@lernapp/shared'
 import { chatPrompt, nextPageHint } from '../cards/chatPrompt'
-import { prepareImport, type ImportTarget, type ModuleContent, type Prepared } from '../cards/prepare'
+import { newModule, prepareImport, type ImportTarget, type ModuleContent, type Prepared } from '../cards/prepare'
 
 type Props = {
   loadModules: () => Promise<Module[]>
@@ -47,6 +47,8 @@ export function CardImportFlow({ loadModules, loadContent, refresh, save, onDone
   const [error, setError] = useState<string | null>(null)
   // In dieser Sitzung gespeicherte Themen und Karten: zählen als vorhanden, auch wenn die Synchronisierung noch fehlt.
   const session = useRef<ModuleContent>({ topics: [], cards: [] })
+  // Neue Module dieses Ablaufs nach Namen: Ein zweiter Versuch (oder der Weg zurück zu Schritt 1) nutzt dieselbe ID.
+  const pending = useRef(new Map<string, Module>())
   const promptArea = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -71,8 +73,7 @@ export function CardImportFlow({ loadModules, loadContent, refresh, save, onDone
   }
 
   const contentOf = async (t: ImportTarget): Promise<ModuleContent> => {
-    if (t.kind === 'new') return EMPTY
-    const local = await loadContent(t.module.id)
+    const local = t.kind === 'existing' ? await loadContent(t.module.id) : EMPTY
     const mine = (x: { moduleId: string }) => x.moduleId === t.module.id
     const known = new Set([...local.topics.map((x) => x.id), ...local.cards.map((x) => x.id)])
     return {
@@ -87,15 +88,20 @@ export function CardImportFlow({ loadModules, loadContent, refresh, save, onDone
     if (choice !== NEW && list.length) {
       t = { kind: 'existing', module: list.find((m) => m.id === choice)! }
     } else {
-      const same = list.find((m) => normalize(m.name) === normalize(newName))
-      t = same ? { kind: 'existing', module: same } : { kind: 'new', name: newName.trim() }
+      const key = normalize(newName)
+      const same = list.find((m) => normalize(m.name) === key)
+      if (same) t = { kind: 'existing', module: same }
+      else {
+        const made = pending.current.get(key) ?? newModule(newName, now())
+        pending.current.set(key, made)
+        t = { kind: 'new', module: made }
+      }
     }
     setBusy(true)
     try {
       const content = await contentOf(t)
-      const name = t.kind === 'existing' ? t.module.name : t.name
       setTarget(t)
-      setPrompt(chatPrompt({ moduleName: name, existingTopics: content.topics.map((x) => x.name) }))
+      setPrompt(chatPrompt({ moduleName: t.module.name, existingTopics: content.topics.map((x) => x.name) }))
       setCopied(null)
       go('prompt')
     } finally {
@@ -143,6 +149,10 @@ export function CardImportFlow({ loadModules, loadContent, refresh, save, onDone
       }
       // Ab jetzt gibt es das Modul: weitere Antworten landen im selben, nicht in einem neuen.
       setTarget({ kind: 'existing', module: prepared.module })
+      if (prepared.isNewModule) {
+        const made = prepared.module
+        setModules((list) => [...(list ?? []).filter((m) => m.id !== made.id), made].sort((a, b) => a.name.localeCompare(b.name, 'de')))
+      }
       setSaved(true)
     } catch (e) {
       setError(`Speichern fehlgeschlagen: ${message(e)}. Prüfe deine Verbindung und versuche es noch einmal.`)

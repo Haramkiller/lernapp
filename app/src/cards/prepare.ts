@@ -1,6 +1,7 @@
 import { normalize, parseGeneration, type Card, type CardDraft, type Module, type Topic } from '@lernapp/shared'
 
-export type ImportTarget = { kind: 'existing'; module: Module } | { kind: 'new'; name: string }
+/** Bei 'new' steht das Modul (mit ID) schon fest, damit ein zweiter Versuch dieselbe Zeile schreibt. */
+export type ImportTarget = { kind: 'existing' | 'new'; module: Module }
 export type ModuleContent = { topics: Topic[]; cards: Card[] }
 export type Prepared = {
   /** Bei 'new' frisch angelegt. */
@@ -29,6 +30,11 @@ function questionText(d: Pick<CardDraft, 'type' | 'payload'>): string {
   }
 }
 
+/** Neues Modul mit fester ID; einmal pro Ablauf anlegen, nicht bei jedem Prüfen. */
+export function newModule(name: string, now: Date, newId: () => string = () => crypto.randomUUID()): Module {
+  return { id: newId(), name: name.trim(), examDate: null, styleProfile: null, updatedAt: now.toISOString() }
+}
+
 /** Doppel-Schlüssel: Typ und normalisierter Fragetext. */
 export const questionKey = (d: Pick<CardDraft, 'type' | 'payload'>): string => `${d.type}|${normalize(questionText(d))}`
 
@@ -42,8 +48,7 @@ export function prepareImport(
 ): Prepared {
   const { result, rejected } = parseGeneration(raw)
   const stamp = now.toISOString()
-  const module: Module =
-    target.kind === 'existing' ? target.module : { id: newId(), name: target.name.trim(), examDate: null, styleProfile: null, updatedAt: stamp }
+  const module = target.module
 
   const seen = new Set(existing.cards.filter((c) => !c.deleted).map(questionKey))
   const byName = new Map(existing.topics.map((t) => [normalize(t.name), t]))
